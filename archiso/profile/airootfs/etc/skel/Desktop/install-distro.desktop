@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Installer Compass Arch
+Comment=Une distribution Arch Linux accessible, avec KDE Plasma et l'intégration Active Directory intégrée
+Exec=pkexec calamares
+Icon=calamares
+Terminal=false
+Categories=System;
+X-KDE-SubstituteUID=false
+StartupNotify=true

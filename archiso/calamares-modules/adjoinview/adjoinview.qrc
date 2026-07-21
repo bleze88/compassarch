@@ -1,0 +1,8 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource>
+  <!-- Le nom du fichier DOIT correspondre au nom du module ("adjoinview") :
+       Calamares::searchQmlFile() cherche par défaut ":/<nom-du-module>.qml"
+       (voir src/libcalamaresui/utils/Qml.cpp, fonction addExpansions()). -->
+  <file>adjoinview.qml</file>
+</qresource>
+</RCC>

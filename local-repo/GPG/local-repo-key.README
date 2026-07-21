@@ -1,0 +1,22 @@
+Le dépôt pacman local est configuré avec `SigLevel = Optional TrustAll` (voir
+archiso/profile/pacman.conf et airootfs/etc/pacman.conf), donc aucune clé GPG
+n'est requise pour un usage basique: c'est un dépôt qui ne quitte jamais la
+machine de build/l'image ISO elle-même, sa surface d'attaque est celle du
+processus de build (déjà root de toute façon).
+
+Si vous voulez signer les paquets et la base du dépôt (recommandé si vous
+distribuez le dépôt local en dehors de l'ISO, par exemple pour permettre des
+mises à jour de `yay`/`realmd` après installation) :
+
+    gpg --batch --quick-generate-key "Compass Arch Local Repo Signing Key" \
+        default default never
+    gpg --export --armor "Compass Arch Local Repo Signing Key" > local-repo/GPG/local-repo-key.asc
+
+Puis dans les deux pacman.conf ([local]):
+    SigLevel = Required DatabaseOptional
+
+Et signer lors du repo-add:
+    repo-add --sign local-repo/out/local.db.tar.zst local-repo/out/*.pkg.tar.zst
+
+La clé privée ne doit JAMAIS être committée. Ce dossier ne doit contenir que
+ce README et, le cas échéant, la clé PUBLIQUE exportée.

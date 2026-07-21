@@ -1,0 +1,32 @@
+# Artefacts de build (régénérés par build/build.sh)
+/build/work/
+/build/out/
+
+# Dépôt pacman local : binaires compilés + PKGBUILD AUR clonés à chaque build
+/local-repo/out/
+/local-repo/pkgbuilds/*/
+!/local-repo/pkgbuilds/.gitkeep
+
+# Clé GPG privée éventuelle (voir local-repo/GPG/local-repo-key.README)
+/local-repo/GPG/*.key
+/local-repo/GPG/private*
+
+# Artefacts CMake des modules Calamares custom
+/archiso/calamares-modules/**/build/
+
+# Copie du dépôt pacman local dans l'overlay ISO (régénérée par
+# build/00-build-local-repo.sh depuis local-repo/out/ - potentiellement
+# des dizaines de Mo de .pkg.tar.zst, ne doit jamais être commitée)
+/archiso/profile/airootfs/repo/local/*
+!/archiso/profile/airootfs/repo/local/.gitkeep
+
+# Modules Calamares custom compilés, copiés dans l'overlay ISO (régénérés
+# par build/01-build-calamares-modules.sh depuis archiso/calamares-modules/,
+# qui reste la seule source de vérité versionnée)
+/archiso/profile/airootfs/usr/lib/calamares/
+/archiso/profile/airootfs/usr/share/calamares/modules/
+
+.DS_Store
+
+# Config locale de l'outillage Claude Code (spécifique à la machine)
+/.claude/

@@ -1,0 +1,48 @@
+# Branding Calamares pour Compass Arch.
+# Voir docs/BUILD.md pour comment remplacer les images placeholder
+# (logo.svg, icon.svg, welcome.svg) par un vrai visuel.
+---
+componentName: compass-arch
+
+welcomeStyleCalamares: false
+welcomeExpandingLogo:  true
+
+windowExpanding: normal
+windowSize:      800px,520px
+windowPlacement: center
+
+sidebar:    widget
+navigation: widget
+
+strings:
+    productName:         "Compass Arch"
+    shortProductName:    "Compass Arch"
+    version:             "2026.07.20"
+    shortVersion:        "2026.07.20"
+    versionedName:       "Compass Arch 2026.07.20"
+    shortVersionedName:  "Compass Arch 2026.07.20"
+    bootloaderEntryName: "Compass Arch"
+    productUrl:          "https://example.invalid"
+    supportUrl:          ""
+    knownIssuesUrl:      ""
+    releaseNotesUrl:     ""
+    donateUrl:           ""
+
+images:
+    productIcon:      "icon.svg"
+    productLogo:      "logo.svg"
+    productWelcome:   "welcome.svg"
+
+style:
+   SidebarBackground:        "#1D2229"
+   SidebarText:              "#FFFFFF"
+   SidebarTextCurrent:       "#1D2229"
+   SidebarBackgroundCurrent: "#3DAEE9"
+
+slideshow:    "show.qml"
+slideshowAPI: 2
+
+uploadServer:
+    type:      "none"
+    url:       ""
+    sizeLimit: -1
