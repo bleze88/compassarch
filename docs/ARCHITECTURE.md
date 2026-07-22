@@ -141,16 +141,37 @@ système installé, où il est inadapté (il pointe vers la config live au
 lieu du `/etc/mkinitcpio.conf` normal, et il manque des hooks utiles à un
 système installé classique).
 
-Fix : `usr/local/bin/fix-target-mkinitcpio.sh`, appelé par une instance du
-module Calamares built-in `shellprocess` (`shellprocess@fixmkinitcpio` dans
-`settings.conf`, juste avant `initcpiocfg`/`initcpio`), qui :
-- restaure un `linux.preset` standard sur la cible ;
-- réécrit `HOOKS` dans `/etc/mkinitcpio.conf` en y insérant `plymouth` à la
-  bonne position (après `base udev`, avant `autodetect`/`kms`) - le module
-  `initcpiocfg` ne sait faire que prepend/append en bout de liste, pas
-  d'insertion positionnée, d'où ce script séparé plutôt que la config
-  native du module ;
-- fixe le thème Plymouth par défaut (`spinner`), de façon non-bloquante.
+Deuxième conséquence du même mécanisme : `mkarchiso` copie le noyau/
+initramfs construits dans le squashfs **vers le média ISO lui-même**
+(`arch/boot/x86_64/`), puis **vide `/boot` dans le squashfs** pour ne pas
+les dupliquer sur l'image (`_cleanup_pacstrap_dir` dans `archiso/mkarchiso`).
+Résultat : `unpackfs` copie un `/boot` **vide** sur la cible, et
+`mkinitcpio` échoue avec `'/boot/vmlinuz-linux' must be readable`.
+
+Fix (deux jobs Calamares `shellprocess`, dans `settings.conf`, juste après
+`unpackfs`) :
+1. `shellprocess@copykernel` → `usr/local/bin/copy-kernel-to-target.sh`
+   (`dontChroot: true`, car `/run/archiso/bootmnt` - où se trouve le noyau
+   sur le média live encore monté - n'est pas visible depuis l'intérieur
+   du chroot cible) : recopie `vmlinuz-linux` et le microcode CPU depuis le
+   média live vers `/boot` de la cible. L'ancien `initramfs-*.img` n'a pas
+   besoin d'être copié, il est régénéré par mkinitcpio de toute façon.
+2. `shellprocess@fixmkinitcpio` → `usr/local/bin/fix-target-mkinitcpio.sh`
+   (`dontChroot: false`, dans le chroot cible cette fois), juste avant
+   `initcpiocfg`/`initcpio`, qui :
+   - restaure un `linux.preset` standard sur la cible ;
+   - réécrit `HOOKS` dans `/etc/mkinitcpio.conf` en y insérant `plymouth` à
+     la bonne position (après `base udev`, avant `autodetect`/`kms`) - le
+     module `initcpiocfg` ne sait faire que prepend/append en bout de
+     liste, pas d'insertion positionnée, d'où ce script séparé plutôt que
+     la config native du module ;
+   - fixe le thème Plymouth par défaut (`spinner`), de façon non-bloquante.
+
+**Piège annexe** : `mkarchiso` ne préserve pas le bit exécutable des
+fichiers d'overlay non listés dans `profiledef.sh` (`file_permissions`) -
+tout script ajouté sous `airootfs/` (comme ces deux-là) doit y être déclaré
+explicitement (`"0:0:755"`), sinon Calamares échoue avec un code de sortie
+126 ("permission denied") en essayant de l'exécuter.
 
 **Ce même piège existerait pour n'importe quel réglage qu'on voudrait
 appliquer différemment en live vs. installé** (le réflexe: si un fichier

@@ -22,9 +22,11 @@ file_permissions=(
   ["/usr/local/bin/choose-mirror"]="0:0:755"
   ["/usr/local/bin/Installation_guide"]="0:0:755"
   ["/usr/local/bin/livecd-sound"]="0:0:755"
-  # Exécuté par Calamares (shellprocess@fixmkinitcpio, voir settings.conf) -
-  # mkarchiso ne préserve PAS le bit exécutable des fichiers d'overlay lors
-  # de la copie (cp --no-preserve=mode), d'où cette entrée explicite. Voir
-  # docs/ARCHITECTURE.md "Boot : mkinitcpio, Plymouth et GRUB".
+  # Exécutés par Calamares (shellprocess@copykernel, shellprocess@fixmkinitcpio -
+  # voir settings.conf) - mkarchiso ne préserve PAS le bit exécutable des
+  # fichiers d'overlay lors de la copie (cp --no-preserve=mode), d'où ces
+  # entrées explicites. Voir docs/ARCHITECTURE.md "Boot : mkinitcpio,
+  # Plymouth et GRUB".
   ["/usr/local/bin/fix-target-mkinitcpio.sh"]="0:0:755"
+  ["/usr/local/bin/copy-kernel-to-target.sh"]="0:0:755"
 )
