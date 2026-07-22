@@ -16,12 +16,15 @@
 # installé classique (autodetect, keymap, consolefont, fsck).
 #
 # Ce script remet linux.preset à son contenu standard (celui du paquet
-# `linux`) et fixe les HOOKS de /etc/mkinitcpio.conf en y insérant "plymouth"
+# `linux`), fixe les HOOKS de /etc/mkinitcpio.conf en y insérant "plymouth"
 # au bon endroit (après base+udev, avant autodetect/kms - le module Calamares
 # "initcpiocfg" ne sait faire que prepend/append en bout de liste, pas
-# d'insertion positionnée, d'où ce script séparé). Le module "initcpio" qui
-# suit dans la séquence se charge ensuite de lancer mkinitcpio -p linux avec
-# cette configuration corrigée.
+# d'insertion positionnée, d'où ce script séparé), et force l'inclusion de
+# modules de contrôleurs de stockage virtualisés courants dans MODULES (voir
+# plus bas - "autodetect" seul s'est avéré insuffisant sur certaines config
+# VMware, causant un timeout au boot). Le module "initcpio" qui suit dans la
+# séquence se charge ensuite de lancer mkinitcpio -p linux avec cette
+# configuration corrigée.
 set -euo pipefail
 
 cat > /etc/mkinitcpio.d/linux.preset <<'EOF'
@@ -45,6 +48,19 @@ EOF
 
 if [[ -f /etc/mkinitcpio.conf ]] && grep -q '^HOOKS=' /etc/mkinitcpio.conf; then
     sed -i -E 's/^HOOKS=\(.*\)/HOOKS=(base udev plymouth autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/' \
+        /etc/mkinitcpio.conf
+fi
+
+# "autodetect" ne bundle que les modules pour le matériel vu au moment du
+# build - suffisant en théorie puisque mkinitcpio tourne ici dans la VM
+# cible elle-même, mais certains contrôleurs de stockage virtualisés
+# (VMware notamment) se sont avérés trop lents à s'initialiser avant le
+# timeout de 30s du hook "block", faisant échouer le boot avec "device did
+# not show up". On ajoute donc ces modules explicitement en plus de
+# l'autodétection, par robustesse (coût: initramfs un peu plus gros, sans
+# risque de casser un boot qui fonctionnait déjà).
+if [[ -f /etc/mkinitcpio.conf ]] && grep -q '^MODULES=' /etc/mkinitcpio.conf; then
+    sed -i -E 's/^MODULES=\(.*\)/MODULES=(virtio_blk virtio_scsi virtio_pci vmw_pvscsi mptspi mptscsih mptbase mpt2sas mpt3sas ahci nvme sd_mod sr_mod)/' \
         /etc/mkinitcpio.conf
 fi
 
