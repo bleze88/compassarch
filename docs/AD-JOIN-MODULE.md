@@ -9,15 +9,44 @@ Deux modules Calamares custom, dans `archiso/calamares-modules/` :
   [calamares-extensions](https://github.com/calamares/calamares-extensions/tree/master/modules/mobile).
 - `Config.h/.cpp` : expose à QML (sous le nom `config`) les propriétés
   `enabled`, `domain`, `ou`, `adminUser`, `adminPassword`, `computerName`,
-  et une propriété calculée `isValid`.
-- `adjoinview.qml` : le formulaire. Case à cocher "Rejoindre un domaine AD"
-  **décochée par défaut** - si elle reste décochée, l'utilisateur peut
-  cliquer sur Suivant immédiatement (étape 100% optionnelle).
+  une propriété calculée `isValid`, et tous les **textes affichés** de la
+  page (`pageTitle`, `pageDescription`, `joinCheckboxText`, `domainLabel`,
+  etc. - voir la liste complète dans `Config.h`).
+- `adjoinview.qml` : le formulaire, purement déclaratif - chaque `Label`/
+  `placeholderText` est bindé à `config.xxx`, jamais à un `qsTr()` direct
+  (voir "Traductions" ci-dessous pour le pourquoi). Case à cocher
+  "Rejoindre un domaine AD" **décochée par défaut** - si elle reste
+  décochée, l'utilisateur peut cliquer sur Suivant immédiatement (étape
+  100% optionnelle).
 - À la sortie de la page (`onLeave()`), les valeurs sont écrites dans
   `GlobalStorage["adjoin"]` (mémoire du processus Calamares - **jamais
   sérialisé sur disque**, y compris le mot de passe).
 - `createJobs()` renvoie une liste vide : ce module ne fait aucun travail
   privilégié lui-même (voir `adjoinjob` ci-dessous).
+- **Traductions** : l'anglais est la langue source (`tr()` dans
+  `Config.cpp` et `ADJoinQmlViewStep.cpp`). Les traductions vivent dans
+  `translations/adjoinview_<code langue>.ts` (un fichier par langue, écrit
+  à la main - pas de `lupdate` disponible pour ce module hors-arbre) et
+  sont compilées en `.qm` par `CMakeLists.txt`, installées à côté du
+  plugin (`.../adjoinview/translations/`). `Config::retranslate()` charge
+  au runtime le `.qm` correspondant à la langue active de Calamares
+  (lue dans `GlobalStorage["LANG"]`, avec repli sur `QLocale()`), et émet
+  `translationsChanged()` pour rebinder le QML.
+  **Piège évité** : Calamares utilise un `QQmlEngine` "nu" (pas
+  `QQmlApplicationEngine`), qui ne réévalue **pas** automatiquement les
+  `qsTr()` QML quand un nouveau `QTranslator` est installé après coup
+  (contrairement à ce que ferait `QQmlApplicationEngine`). Comme les vues
+  Calamares sont toutes construites au démarrage - avant que l'utilisateur
+  n'ait choisi de langue sur la page Bienvenue - un simple `qsTr()` dans le
+  QML restait figé sur la langue de démarrage. D'où le choix d'exposer les
+  textes en `Q_PROPERTY` avec `NOTIFY translationsChanged` : un mécanisme de
+  binding Qt standard, fiable indépendamment de ce détail interne de
+  Calamares. `Config::retranslate()` est rappelée à plusieurs points d'entrée
+  (constructeur, `prettyName()`, `getConfig()`, `onActivate()`) pour
+  rattraper le choix de langue quel que soit le moment où il est fait.
+  Pour ajouter une langue : copier `translations/adjoinview_fr.ts`, traduire
+  les `<translation>`, et ajouter le fichier à `ADJOINVIEW_TS_FILES` dans
+  `CMakeLists.txt`.
 
 ## `adjoinjob` (exécution)
 

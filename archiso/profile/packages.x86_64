@@ -147,6 +147,10 @@ polkit-kde-agent
 sddm
 sddm-kcm
 konsole
+# fastfetch: successeur activement maintenu de neofetch (abandonné par son
+# auteur depuis 2024, retiré des dépôts officiels) - affiché à l'ouverture
+# d'un terminal via airootfs/etc/skel/.bashrc et .zshrc.
+fastfetch
 dolphin
 dolphin-plugins
 kate
@@ -194,3 +198,8 @@ realmd
 krb5
 cifs-utils
 chrony
+
+# --- Boot : thème GRUB personnalisé + splash animé Plymouth ---
+# Voir usr/local/bin/fix-target-mkinitcpio.sh pour comment le hook "plymouth"
+# est correctement positionné dans HOOKS sur le système installé.
+plymouth

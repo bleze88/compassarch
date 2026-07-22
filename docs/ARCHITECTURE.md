@@ -127,3 +127,40 @@ plus pour un gain nul.
 ## Modules Calamares custom
 
 Voir [AD-JOIN-MODULE.md](AD-JOIN-MODULE.md).
+
+## Boot : mkinitcpio, Plymouth et GRUB (piège evité)
+
+`archiso/profile/airootfs/etc/mkinitcpio.d/linux.preset` (hérité de
+`releng`) est nécessaire pour que `mkarchiso` construise correctement
+l'initramfs **du média live lui-même** (hooks `archiso`/`archiso_pxe_*`/
+`memdisk`, indispensables pour booter depuis l'ISO/USB - voir aussi
+`airootfs/etc/mkinitcpio.conf.d/archiso.conf`). Problème : comme
+l'installation se fait par copie directe du système live (`unpackfs`,
+voir plus haut), ce même fichier "live" se retrouve tel quel sur le
+système installé, où il est inadapté (il pointe vers la config live au
+lieu du `/etc/mkinitcpio.conf` normal, et il manque des hooks utiles à un
+système installé classique).
+
+Fix : `usr/local/bin/fix-target-mkinitcpio.sh`, appelé par une instance du
+module Calamares built-in `shellprocess` (`shellprocess@fixmkinitcpio` dans
+`settings.conf`, juste avant `initcpiocfg`/`initcpio`), qui :
+- restaure un `linux.preset` standard sur la cible ;
+- réécrit `HOOKS` dans `/etc/mkinitcpio.conf` en y insérant `plymouth` à la
+  bonne position (après `base udev`, avant `autodetect`/`kms`) - le module
+  `initcpiocfg` ne sait faire que prepend/append en bout de liste, pas
+  d'insertion positionnée, d'où ce script séparé plutôt que la config
+  native du module ;
+- fixe le thème Plymouth par défaut (`spinner`), de façon non-bloquante.
+
+**Ce même piège existerait pour n'importe quel réglage qu'on voudrait
+appliquer différemment en live vs. installé** (le réflexe: si un fichier
+doit être différent selon live/installé, il ne peut pas être un simple
+overlay statique - il faut soit un job Calamares comme celui-ci, soit un
+module Python dédié comme `adjoinjob`).
+
+Le splash GRUB (`GRUB_BACKGROUND`, image dans `airootfs/boot/grub/splash.png`)
+et `GRUB_CMDLINE_LINUX_DEFAULT="... splash"` (pour activer Plymouth), eux,
+n'ont pas ce problème : `/etc/default/grub` n'est utilisé qu'au moment où
+Calamares génère `grub.cfg` sur la cible (modules `grubcfg`/`bootloader`),
+jamais par le live lui-même (qui boote via syslinux/systemd-boot, pas GRUB -
+voir `profiledef.sh`), donc un simple fichier d'overlay statique suffit.

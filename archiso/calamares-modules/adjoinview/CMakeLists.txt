@@ -13,6 +13,16 @@
 # ../adjoinjob, exécuté plus tard dans la phase exec (voir settings.conf).
 # createJobs() renvoie donc une liste vide, comme le fait le module "welcome".
 
+# Traductions (voir translations/adjoinview_fr.ts) : compilées en .qm et
+# installées à côté du plugin, chargées au runtime par
+# ADJoinQmlViewStep::loadTranslations() (pas d'intégration au système de
+# traduction interne de Calamares, dont l'API n'est pas exposée aux modules
+# hors-arbre - voir docs/AD-JOIN-MODULE.md).
+find_package( Qt6 REQUIRED COMPONENTS LinguistTools )
+set( ADJOINVIEW_TS_FILES translations/adjoinview_fr.ts )
+qt6_add_translation( ADJOINVIEW_QM_FILES ${ADJOINVIEW_TS_FILES} )
+add_custom_target( adjoinview_translations ALL DEPENDS ${ADJOINVIEW_QM_FILES} )
+
 calamares_add_plugin( adjoinview
     TYPE viewmodule
     EXPORT_MACRO PLUGINDLLEXPORT_PRO
@@ -24,3 +34,6 @@ calamares_add_plugin( adjoinview
     SHARED_LIB
     NO_CONFIG
 )
+add_dependencies( ${adjoinview_TARGET} adjoinview_translations )
+
+install( FILES ${ADJOINVIEW_QM_FILES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/calamares/modules/adjoinview/translations )

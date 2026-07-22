@@ -12,8 +12,28 @@ QString
 ADJoinQmlViewStep::prettyName() const
 {
     // Nom affiché dans la barre latérale de Calamares - sans ça, Calamares
-    // retombe sur un nom générique du style "QML Step adjoinview.".
-    return tr( "Join Active Directory Domain" );
+    // retombe sur un nom générique du style "QML Step adjoinview.". Volontairement
+    // court (la barre latérale a peu de place) ; le titre complet est dans
+    // Config::pageTitle() (voir adjoinview.qml), qui a plus d'espace pour
+    // être descriptif.
+    //
+    // Rappelé ici à chaque fois (voir Config::retranslate()) car les vues
+    // Calamares sont toutes construites au démarrage, avant que
+    // l'utilisateur n'ait choisi de langue sur la page Bienvenue - Calamares
+    // réinterroge prettyName() à chaque rafraîchissement de la barre
+    // latérale, ce qui nous donne assez d'occasions de rattraper son choix.
+    m_config->retranslate();
+    return tr( "Join Domain" );
+}
+
+void
+ADJoinQmlViewStep::onActivate()
+{
+    // Appelé quand l'utilisateur arrive sur cette page - dernière occasion,
+    // avant affichage du QML, de rattraper un changement de langue (voir
+    // Config::retranslate()).
+    m_config->retranslate();
+    Calamares::QmlViewStep::onActivate();
 }
 
 void
@@ -68,5 +88,9 @@ ADJoinQmlViewStep::jobs() const
 QObject*
 ADJoinQmlViewStep::getConfig()
 {
+    // Autre occasion de rattraper un changement de langue (voir
+    // Config::retranslate()), juste avant que le QML de la page ne soit
+    // instancié.
+    m_config->retranslate();
     return m_config;
 }

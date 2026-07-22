@@ -1,9 +1,16 @@
-/* Page Calamares "Rejoindre un domaine Active Directory" (module adjoinview).
+/* Page Calamares "Join Active Directory Domain" (module adjoinview).
  *
  * Purement de la présentation : chaque champ est bindé à une propriété de
  * Config (exposée ici sous le nom "config", cf. ADJoinQmlViewStep::getConfig()).
  * Le bouton Suivant/Précédent standard de Calamares pilote la navigation ;
  * ADJoinQmlViewStep::isNextEnabled() se contente de refléter config.isValid.
+ *
+ * Les textes affichés viennent de propriétés C++ (config.pageTitle, etc.)
+ * et non d'appels qsTr() directs : le QQmlEngine "nu" utilisé par Calamares
+ * (pas QQmlApplicationEngine) ne réévalue pas automatiquement les qsTr()
+ * après l'installation d'un nouveau QTranslator, alors qu'une Q_PROPERTY
+ * avec NOTIFY se rebind normalement - voir Config::retranslate() et
+ * docs/AD-JOIN-MODULE.md pour le détail de ce piège.
  */
 import io.calamares.core 1.0
 import io.calamares.ui 1.0
@@ -23,22 +30,20 @@ Page {
         spacing: 12
 
         Label {
-            text: qsTr( "Rejoindre un domaine Active Directory" )
+            text: config.pageTitle
             font.bold: true
             font.pointSize: 14
         }
 
         Label {
-            text: qsTr( "Optionnel : si cet ordinateur doit rejoindre un domaine Active Directory "
-                       + "Windows, renseignez les informations ci-dessous. Vous pourrez toujours le "
-                       + "faire plus tard après l'installation avec la commande 'realm join'." )
+            text: config.pageDescription
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
 
         CheckBox {
             id: enabledBox
-            text: qsTr( "Rejoindre un domaine Active Directory pendant l'installation" )
+            text: config.joinCheckboxText
             checked: config.enabled
             onToggled: config.enabled = checked
         }
@@ -51,34 +56,34 @@ Page {
             opacity: enabledBox.checked ? 1.0 : 0.5
             Layout.fillWidth: true
 
-            Label { text: qsTr( "Domaine (ex: exemple.local)" ) }
+            Label { text: config.domainLabel }
             TextField {
                 id: domainField
                 Layout.fillWidth: true
                 text: config.domain
-                placeholderText: qsTr( "exemple.local" )
+                placeholderText: config.domainPlaceholder
                 onTextEdited: config.domain = text
             }
 
-            Label { text: qsTr( "Unité d'organisation (optionnel)" ) }
+            Label { text: config.ouLabel }
             TextField {
                 id: ouField
                 Layout.fillWidth: true
                 text: config.ou
-                placeholderText: qsTr( "OU=Postes,DC=exemple,DC=local" )
+                placeholderText: config.ouPlaceholder
                 onTextEdited: config.ou = text
             }
 
-            Label { text: qsTr( "Nom d'utilisateur admin du domaine" ) }
+            Label { text: config.adminUserLabel }
             TextField {
                 id: adminUserField
                 Layout.fillWidth: true
                 text: config.adminUser
-                placeholderText: qsTr( "administrateur" )
+                placeholderText: config.adminUserPlaceholder
                 onTextEdited: config.adminUser = text
             }
 
-            Label { text: qsTr( "Mot de passe admin du domaine" ) }
+            Label { text: config.adminPasswordLabel }
             TextField {
                 id: adminPasswordField
                 Layout.fillWidth: true
@@ -87,7 +92,7 @@ Page {
                 onTextEdited: config.adminPassword = text
             }
 
-            Label { text: qsTr( "Nom de cet ordinateur" ) }
+            Label { text: config.computerNameLabel }
             TextField {
                 id: computerNameField
                 Layout.fillWidth: true
@@ -101,14 +106,13 @@ Page {
             color: "#c0392b"
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
-            text: qsTr( "Domaine, utilisateur admin, mot de passe et nom de machine sont requis pour continuer." )
+            text: config.validationErrorText
         }
 
         Label {
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
-            text: qsTr( "En cas d'échec de la jonction, l'installation continue normalement : vous pourrez "
-                       + "réessayer manuellement après le premier démarrage." )
+            text: config.retryNoteText
             opacity: 0.7
             font.italic: true
         }
