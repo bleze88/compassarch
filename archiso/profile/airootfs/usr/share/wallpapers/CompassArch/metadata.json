@@ -1,0 +1,13 @@
+{
+    "KPackageStructure": "Plasma/Wallpaper",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Compass Arch Project"
+            }
+        ],
+        "Description": "Fond d'écran par défaut de Compass Arch",
+        "Id": "CompassArch",
+        "Name": "Compass Arch"
+    }
+}

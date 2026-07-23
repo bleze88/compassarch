@@ -204,9 +204,61 @@ doit être différent selon live/installé, il ne peut pas être un simple
 overlay statique - il faut soit un job Calamares comme celui-ci, soit un
 module Python dédié comme `adjoinjob`).
 
+## Comptes live et session dupliquée
+
+Même mécanisme racine que le boot (`unpackfs` copie le système live tel
+quel, voir plus haut) appliqué aux comptes utilisateur : `liveuser` (créé
+par `root/customize_airootfs.sh`, avec autologin SDDM pour la démo sans
+mot de passe) se retrouve tel quel sur le système installé aux côtés du
+compte que l'utilisateur vient de créer via la page Calamares `users` -
+d'où les "deux sessions" observées après une installation (autologin
+automatique sur `liveuser` en plus du compte réel).
+
+Fix (deux mécanismes complémentaires, tous deux après `users` et avant
+`displaymanager` dans `settings.conf`) :
+1. Module Calamares built-in **`removeuser`** (`removeuser.conf`,
+   `username: liveuser`) : supprime le compte `liveuser` lui-même
+   (`userdel`) sur la cible.
+2. `shellprocess@removeliveartifacts` → `usr/local/bin/remove-live-artifacts.sh` :
+   supprime `etc/sddm.conf.d/20-liveuser-autologin.conf`. Ce fragment
+   d'autologin a été délibérément séparé de `10-wayland-default.conf`
+   (qui ne contient plus que les réglages `[Theme]`/`[General]` valables
+   aussi bien en live qu'installé) précisément pour pouvoir être ciblé et
+   supprimé sans toucher au reste - `removeuser` ne connaît que le compte
+   Unix, pas la config SDDM, donc il faut ce second mécanisme même si le
+   compte `liveuser` disparaît.
+
 Le splash GRUB (`GRUB_BACKGROUND`, image dans `airootfs/boot/grub/splash.png`)
 et `GRUB_CMDLINE_LINUX_DEFAULT="... splash"` (pour activer Plymouth), eux,
 n'ont pas ce problème : `/etc/default/grub` n'est utilisé qu'au moment où
 Calamares génère `grub.cfg` sur la cible (modules `grubcfg`/`bootloader`),
 jamais par le live lui-même (qui boote via syslinux/systemd-boot, pas GRUB -
 voir `profiledef.sh`), donc un simple fichier d'overlay statique suffit.
+
+## Image de marque (`branding/compass-arch-background.png`)
+
+Une seule image (logo boussole sur fond métal sombre, voir `branding/` à la
+racine du dépôt) est réutilisée à trois endroits, chacun avec sa propre
+contrainte technique :
+- **GRUB** : copiée telle quelle dans `airootfs/boot/grub/splash.png`
+  (référencée par `GRUB_BACKGROUND`, voir plus haut) - simple overlay
+  statique, aucune particularité.
+- **Plymouth** : thème custom `usr/share/plymouth/themes/compass-arch/`
+  (module `script`, voir `compass-arch.script` - image mise à l'échelle
+  plein écran avec un léger effet de pulsation d'opacité, pas d'assets
+  supplémentaires nécessaires). Activé via `plymouth-set-default-theme
+  compass-arch` à deux endroits distincts et indépendants : dans
+  `customize_airootfs.sh` (pour l'initramfs du média live lui-même) et dans
+  `usr/local/bin/fix-target-mkinitcpio.sh` (pour l'initramfs régénéré sur
+  la cible - voir plus haut, ces deux initramfs sont générés séparément).
+- **Fond d'écran Plasma** : paquet de fond d'écran
+  `usr/share/wallpapers/CompassArch/` (structure KPackage standard :
+  `metadata.json` + `contents/images(_dark)/1920x1080.png`), sélectionné
+  comme fond par défaut en éditant `Image=Next` → `Image=CompassArch` dans
+  les fichiers `defaults` des paquets look-and-feel (`org.kde.breeze.desktop`,
+  `org.kde.breezedark.desktop`, fournis par `plasma-workspace`). **Piège
+  identique à celui de `/etc/skel/.bashrc`** : ces fichiers `defaults`
+  appartiennent à un paquet pacman, donc l'édition se fait via `sed` dans
+  `customize_airootfs.sh` **après** pacstrap, jamais via un overlay
+  statique au même chemin (qui ferait échouer pacstrap avec un conflit de
+  fichier).

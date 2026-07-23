@@ -85,11 +85,14 @@ if [[ -f /etc/mkinitcpio.conf ]] && grep -q '^MODULES=' /etc/mkinitcpio.conf; th
         /etc/mkinitcpio.conf
 fi
 
-# Thème Plymouth par défaut (voir packages.x86_64) - avant la régénération
-# de l'initramfs par le module Calamares "initcpio" qui suit dans la séquence,
-# pour que le bon thème soit déjà embarqué. Non-bloquant délibérément (||
-# true) : un thème manquant ne doit pas faire échouer toute l'installation,
-# seule la partie mkinitcpio ci-dessus est critique pour le boot.
+# Thème Plymouth par défaut (voir
+# usr/share/plymouth/themes/compass-arch/ - installé via packages.x86_64
+# du point de vue paquets, mais le thème lui-même est un simple overlay
+# airootfs) - avant la régénération de l'initramfs par le module Calamares
+# "initcpio" qui suit dans la séquence, pour que le bon thème soit déjà
+# embarqué. Non-bloquant délibérément (|| true) : un thème manquant ne doit
+# pas faire échouer toute l'installation, seule la partie mkinitcpio
+# ci-dessus est critique pour le boot.
 if command -v plymouth-set-default-theme >/dev/null 2>&1; then
-    plymouth-set-default-theme spinner || true
+    plymouth-set-default-theme compass-arch || true
 fi

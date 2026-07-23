@@ -29,4 +29,7 @@ file_permissions=(
   # Plymouth et GRUB".
   ["/usr/local/bin/fix-target-mkinitcpio.sh"]="0:0:755"
   ["/usr/local/bin/copy-kernel-to-target.sh"]="0:0:755"
+  # Exécuté par Calamares (shellprocess@removeliveartifacts - voir
+  # settings.conf) - même piège de bit exécutable que les deux ci-dessus.
+  ["/usr/local/bin/remove-live-artifacts.sh"]="0:0:755"
 )

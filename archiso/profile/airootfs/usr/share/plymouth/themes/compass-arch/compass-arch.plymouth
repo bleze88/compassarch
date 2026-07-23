@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Compass Arch
+Description=Écran de démarrage Compass Arch (logo boussole sur fond sombre)
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/compass-arch
+ScriptFile=/usr/share/plymouth/themes/compass-arch/compass-arch.script
