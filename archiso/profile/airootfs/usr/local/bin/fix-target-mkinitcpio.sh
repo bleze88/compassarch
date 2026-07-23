@@ -25,6 +25,21 @@
 # VMware, causant un timeout au boot). Le module "initcpio" qui suit dans la
 # séquence se charge ensuite de lancer mkinitcpio -p linux avec cette
 # configuration corrigée.
+#
+# PIÈGE CRITIQUE (débogué en lisant /init et /init_functions dans le shell de
+# secours d'une VM cible) : mkinitcpio charge /etc/mkinitcpio.conf PUIS les
+# fragments /etc/mkinitcpio.conf.d/*.conf par ordre alphabétique, et chaque
+# HOOKS= rencontré ÉCRASE entièrement la valeur précédente (pas de fusion).
+# Le fragment live archiso.conf définit son propre HOOKS=(... archiso
+# archiso_loop_mnt archiso_pxe_* memdisk ...) - s'il reste présent sur la
+# cible, il écrase silencieusement notre correction ci-dessous au moment où
+# mkinitcpio régénère l'image. Le hook "archiso" ainsi réactivé attend un
+# média de boot amovible (ISO/USB) qui n'existe jamais sur un système
+# installé sur disque : boot bloqué indéfiniment sur "ERROR: '' device did
+# not show up after N seconds..." (/hooks/archiso), un message qui n'a
+# RIEN à voir avec root=/UUID (lesquels sont corrects) - d'où l'inefficacité
+# de rootdelay= ou de vérifier l'UUID/fstab. Ce script doit donc supprimer
+# ce fragment AVANT que le module Calamares "initcpio" ne lance mkinitcpio.
 set -euo pipefail
 
 cat > /etc/mkinitcpio.d/linux.preset <<'EOF'
@@ -45,6 +60,12 @@ default_image="/boot/initramfs-linux.img"
 fallback_image="/boot/initramfs-linux-fallback.img"
 fallback_options="-S autodetect"
 EOF
+
+# Supprime le(s) fragment(s) mkinitcpio.conf.d hérités du live (archiso.conf
+# notamment) - voir le commentaire en tête de fichier : leur propre HOOKS=
+# écraserait sinon silencieusement notre correction ci-dessous au moment de
+# la régénération de l'initramfs par le module Calamares "initcpio".
+rm -f /etc/mkinitcpio.conf.d/archiso.conf
 
 if [[ -f /etc/mkinitcpio.conf ]] && grep -q '^HOOKS=' /etc/mkinitcpio.conf; then
     sed -i -E 's/^HOOKS=\(.*\)/HOOKS=(base udev plymouth autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)/' \

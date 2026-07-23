@@ -160,12 +160,37 @@ Fix (deux jobs Calamares `shellprocess`, dans `settings.conf`, juste après
    (`dontChroot: false`, dans le chroot cible cette fois), juste avant
    `initcpiocfg`/`initcpio`, qui :
    - restaure un `linux.preset` standard sur la cible ;
+   - **supprime `/etc/mkinitcpio.conf.d/archiso.conf`** (voir piège
+     ci-dessous - critique, sans quoi le boot de la cible reste bloqué) ;
    - réécrit `HOOKS` dans `/etc/mkinitcpio.conf` en y insérant `plymouth` à
      la bonne position (après `base udev`, avant `autodetect`/`kms`) - le
      module `initcpiocfg` ne sait faire que prepend/append en bout de
      liste, pas d'insertion positionnée, d'où ce script séparé plutôt que
      la config native du module ;
    - fixe le thème Plymouth par défaut (`spinner`), de façon non-bloquante.
+
+**Piège le plus retors de tous - `/etc/mkinitcpio.conf.d/archiso.conf`** :
+mkinitcpio charge `/etc/mkinitcpio.conf` PUIS les fragments
+`/etc/mkinitcpio.conf.d/*.conf` par ordre alphabétique, et chaque `HOOKS=`
+rencontré **écrase entièrement** la valeur précédente (aucune fusion). Le
+fragment live `archiso.conf` (copié tel quel sur la cible par `unpackfs`,
+comme tout le reste du système live) définit son propre
+`HOOKS=(base udev microcode modconf kms memdisk archiso archiso_loop_mnt
+archiso_pxe_* block filesystems keyboard)` - s'il reste présent, il écrase
+silencieusement la correction du `HOOKS` ci-dessus au moment où mkinitcpio
+régénère réellement l'image, **même si `/etc/mkinitcpio.conf` lui-même est
+correct**. Le hook `archiso` ainsi réactivé cherche au boot un média
+amovible (ISO/USB) qui n'existe jamais sur un système installé sur disque,
+et bloque indéfiniment avec `ERROR: '' device did not show up after N
+seconds...` (message émis par `/hooks/archiso`, **sans rapport avec
+`root=`/UUID**, qui restent corrects). Symptôme trompeur : ce message a
+exactement la même forme que l'erreur classique "root device introuvable",
+et `rootdelay=`/vérification de l'UUID/de `/etc/fstab` (tous corrects
+dans ce cas) n'ont donc aucun effet - le vrai diagnostic nécessite de lire
+`/init`, `/init_functions` et `/hooks/*` directement dans le shell de
+secours (`grep -rn "did not show up" /hooks/ /init_functions /init`) pour
+localiser la fonction fautive plutôt que de suivre la piste (fausse) du
+device racine.
 
 **Piège annexe** : `mkarchiso` ne préserve pas le bit exécutable des
 fichiers d'overlay non listés dans `profiledef.sh` (`file_permissions`) -
