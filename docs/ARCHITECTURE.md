@@ -192,6 +192,18 @@ secours (`grep -rn "did not show up" /hooks/ /init_functions /init`) pour
 localiser la fonction fautive plutôt que de suivre la piste (fausse) du
 device racine.
 
+**Filet de sécurité supplémentaire** : ce fragment a été observé réapparu
+(ou jamais supprimé) sur une installation malgré la suppression par
+`fix-target-mkinitcpio.sh`, sans que la cause exacte ait pu être confirmée
+(le job ne remonte pas d'échec, donc son `rm -f` s'exécute bien). Par
+robustesse, une seconde suppression a été ajoutée comme job Calamares
+indépendant (`shellprocess@removearchisoconf`, script inline `rm -f
+/etc/mkinitcpio.conf.d/archiso.conf`), positionnée juste avant `initcpio`
+(après `initcpiocfg`) plutôt qu'avant - la dernière étape avant que
+`mkinitcpio -p linux` ne soit réellement invoqué, pour éliminer toute
+fenêtre où ce fragment pourrait persister ou être recréé entre les deux
+jobs.
+
 **Piège annexe** : `mkarchiso` ne préserve pas le bit exécutable des
 fichiers d'overlay non listés dans `profiledef.sh` (`file_permissions`) -
 tout script ajouté sous `airootfs/` (comme ces deux-là) doit y être déclaré
