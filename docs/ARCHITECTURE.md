@@ -254,7 +254,15 @@ racine du dépôt) est réutilisée à trois endroits, chacun avec sa propre
 contrainte technique :
 - **GRUB** : copiée telle quelle dans `airootfs/boot/grub/splash.png`
   (référencée par `GRUB_BACKGROUND`, voir plus haut) - simple overlay
-  statique, aucune particularité.
+  statique, aucune particularité. **Piège observé** : `GRUB_TERMINAL_OUTPUT`
+  doit être explicitement `gfxterm` (pas laissé commenté/par défaut) sinon
+  GRUB reste en mode texte et ignore `GRUB_BACKGROUND` silencieusement: et
+  même avec `gfxterm` activé, `GRUB_GFXMODE=auto` seul s'est avéré
+  insuffisant sur une VM VMware testée (détection VBE en échec, retour
+  silencieux au mode texte, sans erreur ni image) - la résolution doit être
+  forcée explicitement (`GRUB_GFXMODE=1024x768x32,auto`) et les modules
+  vidéo précchargés explicitement (`GRUB_PRELOAD_MODULES=".. all_video"`)
+  plutôt que de compter sur la détection automatique de `grub-mkconfig`.
 - **Plymouth** : thème custom `usr/share/plymouth/themes/compass-arch/`
   (module `script`, voir `compass-arch.script` - image mise à l'échelle
   plein écran avec un léger effet de pulsation d'opacité, pas d'assets
