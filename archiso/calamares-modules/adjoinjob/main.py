@@ -52,6 +52,29 @@ def run():
     # de toute façon dans ce chroot (voir note --install= ci-dessous - même
     # cause : pas de D-Bus système/systemd PID 1 disponible).
 
+    # /etc/resolv.conf du système cible est un symlink vers
+    # /run/systemd/resolve/stub-resolv.conf (voir airootfs/etc/resolv.conf) -
+    # ça fonctionne sur le live, où systemd-resolved tourne réellement, mais
+    # PAS dans ce chroot (juste un chroot(), pas un vrai système avec ses
+    # services démarrés : pas de stub-resolv.conf peuplé dans son /run).
+    # Confirmé en conditions réelles : chronyd bloquait 30s (impossible de
+    # résoudre les serveurs NTP) et realm join échouait avec "No such realm
+    # found" malgré un `realm discover` réussi sur le live - la résolution
+    # DNS échouait silencieusement dans le chroot, pas un souci
+    # réseau/identifiants/domaine. Fix : on lit les vrais serveurs DNS
+    # (fichier "uplink" de systemd-resolved, avec de vraies IP, pas le stub
+    # 127.0.0.53) depuis CE process (qui tourne sur le live, pas chrooté) et
+    # on les écrit dans le resolv.conf de la cible avant d'aller plus loin.
+    for candidate in ("/run/systemd/resolve/resolv.conf", "/etc/resolv.conf"):
+        try:
+            with open(candidate) as f:
+                resolv_content = f.read()
+        except OSError:
+            continue
+        if "nameserver" in resolv_content:
+            libcalamares.utils.target_env_call(["sh", "-c", "cat > /etc/resolv.conf"], resolv_content)
+            break
+
     # Kerberos est sensible au décalage d'horloge : on force une synchro
     # ponctuelle avant la jonction (chronyd est déjà activé par
     # services-systemd, voir airootfs/etc/calamares/modules/services-systemd.conf).

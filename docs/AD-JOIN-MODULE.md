@@ -56,15 +56,37 @@ Deux modules Calamares custom, dans `archiso/calamares-modules/` :
   `bootloader`.
 - Lit `GlobalStorage["adjoin"]`. Si `enabled` est faux, ne fait rien.
 - Sinon, dans le chroot cible (`libcalamares.utils.target_env_call`) :
-  1. `chronyd -q` (synchro horloge ponctuelle - Kerberos est sensible au
+  1. Écrit un `/etc/resolv.conf` fonctionnel dans la cible (voir piège
+     DNS ci-dessous)
+  2. `chronyd -q` (synchro horloge ponctuelle - Kerberos est sensible au
      décalage d'horloge)
-  2. `realm join --install=/ --user <adminUser> [--computer-ou <ou>] <domain>`,
+  3. `realm join --install=/ --user <adminUser> [--computer-ou <ou>] <domain>`,
      avec le mot de passe transmis **par stdin** (jamais en argument de
      commande visible dans `/proc`, jamais écrit sur disque)
-  3. `systemctl enable sssd.service`
+  4. `systemctl enable sssd.service`
   (Pas de `hostnamectl set-hostname` : le hostname est déjà positionné par
   le module Calamares `users` avant que ce job ne s'exécute, et
   `hostnamectl` échouerait de toute façon ici - voir piège ci-dessous.)
+
+  **Piège critique - DNS ne fonctionne pas dans le chroot** :
+  `airootfs/etc/resolv.conf` est un symlink vers
+  `/run/systemd/resolve/stub-resolv.conf` (setup `systemd-resolved`
+  standard). Ça fonctionne très bien sur le live, où `systemd-resolved`
+  tourne réellement en tant que service - mais **pas** dans le chroot cible
+  utilisé par Calamares (`target_env_call` fait un simple `chroot()`, pas un
+  vrai système avec ses services démarrés : le `/run` du chroot n'a pas de
+  stub-resolv.conf peuplé). Confirmé en conditions réelles : `chronyd -q`
+  bloquait systématiquement 30 secondes (impossible de résoudre les
+  serveurs NTP) et `realm join` échouait avec `realm: No such realm found`
+  **alors qu'un `realm discover` lancé sur le live (hors chroot) trouvait le
+  domaine sans problème** - la résolution DNS échouait silencieusement dans
+  le chroot, pas un souci réseau/identifiants/domaine réel. Fix : avant
+  toute autre chose, le job lit les vrais serveurs DNS depuis
+  `/run/systemd/resolve/resolv.conf` (le fichier "uplink" de
+  systemd-resolved, avec de vraies IP - pas `/etc/resolv.conf`, qui pointe
+  vers le stub `127.0.0.53`) **depuis ce process Python lui-même** (qui
+  tourne sur le live, pas chrooté) et les écrit dans le `/etc/resolv.conf`
+  de la cible via `target_env_call`.
 
   **Piège critique - `--install=/` indispensable** : `realm join` cherche
   par défaut à parler au démon `realmd` via D-Bus **système**, qui n'existe
