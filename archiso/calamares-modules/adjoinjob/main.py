@@ -65,6 +65,13 @@ def run():
     # (fichier "uplink" de systemd-resolved, avec de vraies IP, pas le stub
     # 127.0.0.53) depuis CE process (qui tourne sur le live, pas chrooté) et
     # on les écrit dans le resolv.conf de la cible avant d'aller plus loin.
+    #
+    # Piège : un premier essai avec juste "cat > /etc/resolv.conf" a échoué
+    # ("No such file or directory") - /etc/resolv.conf est un symlink vers
+    # /run/systemd/resolve/stub-resolv.conf, et cette cible n'existe pas
+    # dans ce chroot (son /run est vide, pas de service en cours), donc la
+    # redirection suit le lien mort et ne peut rien créer. Il faut d'abord
+    # supprimer le symlink pour écrire un vrai fichier à sa place.
     for candidate in ("/run/systemd/resolve/resolv.conf", "/etc/resolv.conf"):
         try:
             with open(candidate) as f:
@@ -72,7 +79,9 @@ def run():
         except OSError:
             continue
         if "nameserver" in resolv_content:
-            libcalamares.utils.target_env_call(["sh", "-c", "cat > /etc/resolv.conf"], resolv_content)
+            libcalamares.utils.target_env_call(
+                ["sh", "-c", "rm -f /etc/resolv.conf && cat > /etc/resolv.conf"], resolv_content
+            )
             break
 
     # Kerberos est sensible au décalage d'horloge : on force une synchro

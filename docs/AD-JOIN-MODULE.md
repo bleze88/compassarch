@@ -86,7 +86,13 @@ Deux modules Calamares custom, dans `archiso/calamares-modules/` :
   systemd-resolved, avec de vraies IP - pas `/etc/resolv.conf`, qui pointe
   vers le stub `127.0.0.53`) **depuis ce process Python lui-même** (qui
   tourne sur le live, pas chrooté) et les écrit dans le `/etc/resolv.conf`
-  de la cible via `target_env_call`.
+  de la cible via `target_env_call`. **Sous-piège** : un premier essai avec
+  simplement `cat > /etc/resolv.conf` échouait aussi (`No such file or
+  directory`) - `/etc/resolv.conf` de la cible est lui-même un symlink
+  (vers `stub-resolv.conf`, voir plus haut), et cette cible n'existe pas
+  dans le chroot, donc la redirection shell suit un lien mort et ne peut
+  rien créer. Il faut `rm -f /etc/resolv.conf` d'abord pour remplacer le
+  symlink par un vrai fichier.
 
   **Piège critique - `--install=/` indispensable** : `realm join` cherche
   par défaut à parler au démon `realmd` via D-Bus **système**, qui n'existe
