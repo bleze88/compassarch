@@ -54,20 +54,30 @@ def run():
     # services-systemd, voir airootfs/etc/calamares/modules/services-systemd.conf).
     libcalamares.utils.target_env_call(["chronyd", "-q"], "", 30)
 
-    join_cmd = ["realm", "join", "--user", admin_user]
+    join_cmd = ["realm", "join", "--user", admin_user, "--verbose"]
     if ou:
         join_cmd += ["--computer-ou", ou]
     join_cmd.append(domain)
 
-    exit_code = libcalamares.utils.target_env_call(join_cmd, admin_password + "\n", 120)
-
-    if exit_code != 0:
+    # check_target_env_output (plutôt que target_env_call) capture aussi la
+    # sortie de 'realm join' - target_env_call ne renvoie que le code de
+    # sortie et jette le texte, qui est pourtant la seule info utile pour
+    # diagnostiquer un échec Kerberos/AD après coup (voir
+    # /root/.cache/calamares/session.log sur le live, où warning() écrit).
+    try:
+        output = libcalamares.utils.check_target_env_output(join_cmd, admin_password + "\n", 120)
+    except Exception as exc:
+        output = getattr(exc, "output", str(exc))
         libcalamares.utils.warning(
-            "adjoinjob: 'realm join {}' a échoué (code {}). L'installation "
-            "continue ; jonction manuelle possible après coup avec "
-            "'realm join'.".format(domain, exit_code)
+            "adjoinjob: 'realm join {}' a échoué. L'installation continue ; "
+            "jonction manuelle possible après coup avec 'realm join'.\n"
+            "--- sortie de realm join ---\n{}".format(domain, output)
         )
         return None
+
+    libcalamares.utils.debug(
+        "adjoinjob: sortie de realm join --verbose :\n{}".format(output)
+    )
 
     libcalamares.utils.target_env_call(["systemctl", "enable", "sssd.service"])
     libcalamares.utils.debug("adjoinjob: jonction au domaine {} réussie.".format(domain))

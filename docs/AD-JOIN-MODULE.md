@@ -71,6 +71,20 @@ Deux modules Calamares custom, dans `archiso/calamares-modules/` :
   toujours faire `realm join` manuellement après le premier démarrage. Ce
   choix UX est documenté dans le code (`adjoinjob/main.py`) - à revoir si
   vous préférez un comportement bloquant.
+- **Diagnostiquer un échec** : `realm join` est appelé via
+  `libcalamares.utils.check_target_env_output` (pas `target_env_call`, qui
+  ne renvoie qu'un code de sortie et jette la sortie texte) - la sortie
+  complète de `realm join --verbose` est journalisée dans le log de session
+  Calamares en cas d'échec (avertissement) comme en cas de succès (debug).
+  Ce log vit sur le système **live** (RAM, perdu au redémarrage) à
+  `/root/.cache/calamares/session.log` (chemin déterminé par
+  `QStandardPaths::CacheLocation` pour l'utilisateur root, sous lequel
+  Calamares tourne via `pkexec` - **pas** `/var/log/Calamares.log`, piège
+  déjà rencontré) - à récupérer **avant** de redémarrer si besoin de le
+  consulter après coup. Une fois le système installé démarré, l'état réel
+  de la jonction se vérifie directement : `realm list` (domaines rejoints),
+  `journalctl -u sssd`, et `/var/log/sssd/*.log` (le plus détaillé pour les
+  problèmes Kerberos/LDAP spécifiquement).
 
 ## NSS / PAM (statique, hors du module)
 
