@@ -33,7 +33,10 @@ chmod 0440 /etc/sudoers.d/99-liveuser
 # Thème Plymouth par défaut pour le média live lui-même (le système
 # installé le refixe indépendamment dans usr/local/bin/fix-target-mkinitcpio.sh,
 # voir docs/ARCHITECTURE.md - les deux initramfs sont générés séparément).
-plymouth-set-default-theme compass-arch || true
+# "spinner" (natif, confirmé fonctionnel) plutôt que le thème custom
+# "compass-arch" - voir le commentaire équivalent dans
+# fix-target-mkinitcpio.sh pour le pourquoi.
+plymouth-set-default-theme spinner || true
 
 # Fond d'écran par défaut de Plasma (usr/share/wallpapers/CompassArch/, voir
 # docs/ARCHITECTURE.md "Fond d'écran par défaut"). Les fichiers "defaults"

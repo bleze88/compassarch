@@ -85,14 +85,21 @@ if [[ -f /etc/mkinitcpio.conf ]] && grep -q '^MODULES=' /etc/mkinitcpio.conf; th
         /etc/mkinitcpio.conf
 fi
 
-# Thème Plymouth par défaut (voir
-# usr/share/plymouth/themes/compass-arch/ - installé via packages.x86_64
-# du point de vue paquets, mais le thème lui-même est un simple overlay
-# airootfs) - avant la régénération de l'initramfs par le module Calamares
-# "initcpio" qui suit dans la séquence, pour que le bon thème soit déjà
-# embarqué. Non-bloquant délibérément (|| true) : un thème manquant ne doit
-# pas faire échouer toute l'installation, seule la partie mkinitcpio
-# ci-dessus est critique pour le boot.
+# Thème Plymouth par défaut. Un thème custom "compass-arch" (module
+# "script", voir usr/share/plymouth/themes/compass-arch/) a été essayé et
+# se charge/exécute sans erreur (confirmé via plymouthd --debug), mais son
+# rendu visuel réel au boot n'a jamais pu être confirmé de façon fiable
+# (tests manuels via `plymouth --show-splash` invalidés par une session
+# graphique déjà active qui empêche Plymouth de vraiment prendre l'écran -
+# voir "Using console viewer instead of kernel framebuffer console" dans le
+# debug). Repli sur "spinner" (thème natif du paquet plymouth, module
+# "two-step", déjà confirmé fonctionnel visuellement en conditions réelles)
+# le temps de valider/déboguer le thème custom plus tard si besoin. Avant la
+# régénération de l'initramfs par le module Calamares "initcpio" qui suit
+# dans la séquence, pour que le bon thème soit déjà embarqué.
+# Non-bloquant délibérément (|| true) : un thème manquant ne doit pas faire
+# échouer toute l'installation, seule la partie mkinitcpio ci-dessus est
+# critique pour le boot.
 if command -v plymouth-set-default-theme >/dev/null 2>&1; then
-    plymouth-set-default-theme compass-arch || true
+    plymouth-set-default-theme spinner || true
 fi
