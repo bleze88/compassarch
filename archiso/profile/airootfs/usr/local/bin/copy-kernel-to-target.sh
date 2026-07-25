@@ -15,6 +15,17 @@
 # copié : fix-target-mkinitcpio.sh + le module Calamares "initcpio" le
 # régénèrent de toute façon.
 #
+# Même piège pour l'image de fond GRUB : ce n'est PAS un fichier de
+# kernel/initramfs, mais comme mkarchiso vide TOUT /boot (pas seulement le
+# noyau), un ancien overlay statique à airootfs/boot/grub/splash.png se
+# faisait lui aussi effacer avant d'atteindre la cible - confirmé par
+# diagnostic (ls -la /boot/grub/splash.png -> "No such file or directory"
+# sur une install pourtant "réussie", d'où l'image de fond GRUB jamais
+# affichée malgré une config /etc/default/grub par ailleurs correcte). Fix :
+# la source vit maintenant hors de /boot (usr/share/compass-arch/, jamais
+# vidé par mkarchiso) et ce script la recopie explicitement dans
+# $TARGET/boot/grub/ ci-dessous, comme pour le noyau.
+#
 # Appelé avec dontChroot: true (tourne donc sur le système LIVE, pas dans le
 # chroot cible) car /run/archiso/bootmnt n'est pas visible depuis l'intérieur
 # du chroot cible. $1 est le point de montage de la cible (${ROOT}, résolu
@@ -35,3 +46,10 @@ for ucode in "$UCODE_SRC"/*-ucode.img; do
     [[ -e "$ucode" ]] || continue
     cp -f "$ucode" "$TARGET/boot/$(basename "$ucode")"
 done
+
+# Image de fond GRUB (voir commentaire plus haut) - source hors de /boot,
+# donc toujours présente sur le système live à ce stade.
+if [[ -f /usr/share/compass-arch/grub-splash.png ]]; then
+    mkdir -p "$TARGET/boot/grub"
+    cp -f /usr/share/compass-arch/grub-splash.png "$TARGET/boot/grub/splash.png"
+fi

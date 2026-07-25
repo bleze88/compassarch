@@ -252,17 +252,28 @@ voir `profiledef.sh`), donc un simple fichier d'overlay statique suffit.
 Une seule image (logo boussole sur fond métal sombre, voir `branding/` à la
 racine du dépôt) est réutilisée à trois endroits, chacun avec sa propre
 contrainte technique :
-- **GRUB** : copiée telle quelle dans `airootfs/boot/grub/splash.png`
-  (référencée par `GRUB_BACKGROUND`, voir plus haut) - simple overlay
-  statique, aucune particularité. **Piège observé** : `GRUB_TERMINAL_OUTPUT`
+- **GRUB** : référencée par `GRUB_BACKGROUND="/boot/grub/splash.png"` (voir
+  plus haut) mais **piège critique, même famille que celui du noyau** (voir
+  plus haut "Boot : mkinitcpio, Plymouth et GRUB") : `mkarchiso` vide
+  ENTIÈREMENT `/boot` dans le squashfs après le build, pas seulement les
+  fichiers de noyau - un overlay statique à `airootfs/boot/grub/splash.png`
+  se faisait donc effacer avant même d'atteindre la cible (confirmé par
+  diagnostic : `ls /boot/grub/splash.png` → absent sur une install
+  "réussie", malgré un `/etc/default/grub` par ailleurs correct et un
+  `grub.cfg` avec `insmod gfxterm`/`terminal_output gfxterm` mais **sans**
+  `insmod png`/`background_image`, preuve que `grub-mkconfig` n'avait
+  simplement rien trouvé à ce chemin). Fix : l'image source vit maintenant
+  hors de `/boot` (`airootfs/usr/share/compass-arch/grub-splash.png`,
+  jamais vidé par `mkarchiso`), et `copy-kernel-to-target.sh` (déjà
+  responsable de restaurer le noyau depuis le média live, voir plus haut)
+  la recopie en plus vers `$TARGET/boot/grub/splash.png`.
+  Piège annexe indépendant, observé en même temps : `GRUB_TERMINAL_OUTPUT`
   doit être explicitement `gfxterm` (pas laissé commenté/par défaut) sinon
-  GRUB reste en mode texte et ignore `GRUB_BACKGROUND` silencieusement: et
-  même avec `gfxterm` activé, `GRUB_GFXMODE=auto` seul s'est avéré
-  insuffisant sur une VM VMware testée (détection VBE en échec, retour
-  silencieux au mode texte, sans erreur ni image) - la résolution doit être
-  forcée explicitement (`GRUB_GFXMODE=1024x768x32,auto`) et les modules
-  vidéo précchargés explicitement (`GRUB_PRELOAD_MODULES=".. all_video"`)
-  plutôt que de compter sur la détection automatique de `grub-mkconfig`.
+  GRUB reste en mode texte, et `GRUB_GFXMODE=auto` seul s'est avéré
+  insuffisant sur la VM VMware testée (détection VBE en échec, retour
+  silencieux au mode texte) - résolution forcée explicitement
+  (`GRUB_GFXMODE=1024x768x32,auto`) et modules vidéo préchargés
+  explicitement (`GRUB_PRELOAD_MODULES=".. all_video"`) par robustesse.
 - **Plymouth** : thème custom `usr/share/plymouth/themes/compass-arch/`
   (module `script`, voir `compass-arch.script` - image mise à l'échelle
   plein écran avec un léger effet de pulsation d'opacité, pas d'assets
