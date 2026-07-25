@@ -275,13 +275,21 @@ contrainte technique :
   (`GRUB_GFXMODE=1024x768x32,auto`) et modules vidéo préchargés
   explicitement (`GRUB_PRELOAD_MODULES=".. all_video"`) par robustesse.
 - **Plymouth** : thème custom `usr/share/plymouth/themes/compass-arch/`
-  (module `script`, voir `compass-arch.script` - image mise à l'échelle
-  plein écran avec un léger effet de pulsation d'opacité, pas d'assets
-  supplémentaires nécessaires). Activé via `plymouth-set-default-theme
+  (module `script`, voir `compass-arch.script`, avec un léger effet de
+  pulsation d'opacité). Activé via `plymouth-set-default-theme
   compass-arch` à deux endroits distincts et indépendants : dans
   `customize_airootfs.sh` (pour l'initramfs du média live lui-même) et dans
   `usr/local/bin/fix-target-mkinitcpio.sh` (pour l'initramfs régénéré sur
   la cible - voir plus haut, ces deux initramfs sont générés séparément).
+  **Piège observé** : la première version du script appelait
+  `.Scale(Window.GetWidth(), Window.GetHeight())` pour étirer l'image en
+  plein écran - image jamais affichée au boot (écran presque noir), alors
+  que le thème natif `spinner` (module `two-step`, code compilé, pas
+  interprété) fonctionnait bien sur la même VM - donc pas un problème de
+  rendu DRM/KMS en soi, mais probablement le coût de cette mise à l'échelle
+  dans l'environnement contraint de l'initramfs. Fix : suivre le patron de
+  l'exemple officiel Plymouth (`usr/share/plymouth/themes/script/script.script`)
+  - image centrée à sa taille native, sans `.Scale()`.
 - **Fond d'écran Plasma** : paquet de fond d'écran
   `usr/share/wallpapers/CompassArch/` (structure KPackage standard :
   `metadata.json` + `contents/images(_dark)/1920x1080.png`), sélectionné

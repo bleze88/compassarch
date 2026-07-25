@@ -158,6 +158,8 @@ ark
 spectacle
 gwenview
 okular
+# Navigateur web par défaut, live + installé (officiel, pas besoin de l'AUR).
+firefox
 xdg-desktop-portal-kde
 xdg-desktop-portal
 qt6-wayland
