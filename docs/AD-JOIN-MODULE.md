@@ -56,13 +56,31 @@ Deux modules Calamares custom, dans `archiso/calamares-modules/` :
   `bootloader`.
 - Lit `GlobalStorage["adjoin"]`. Si `enabled` est faux, ne fait rien.
 - Sinon, dans le chroot cible (`libcalamares.utils.target_env_call`) :
-  1. `hostnamectl set-hostname <computerName>`
-  2. `chronyd -q` (synchro horloge ponctuelle - Kerberos est sensible au
+  1. `chronyd -q` (synchro horloge ponctuelle - Kerberos est sensible au
      décalage d'horloge)
-  3. `realm join --user <adminUser> [--computer-ou <ou>] <domain>`, avec le
-     mot de passe transmis **par stdin** (jamais en argument de commande
-     visible dans `/proc`, jamais écrit sur disque)
-  4. `systemctl enable sssd.service`
+  2. `realm join --install=/ --user <adminUser> [--computer-ou <ou>] <domain>`,
+     avec le mot de passe transmis **par stdin** (jamais en argument de
+     commande visible dans `/proc`, jamais écrit sur disque)
+  3. `systemctl enable sssd.service`
+  (Pas de `hostnamectl set-hostname` : le hostname est déjà positionné par
+  le module Calamares `users` avant que ce job ne s'exécute, et
+  `hostnamectl` échouerait de toute façon ici - voir piège ci-dessous.)
+
+  **Piège critique - `--install=/` indispensable** : `realm join` cherche
+  par défaut à parler au démon `realmd` via D-Bus **système**, qui n'existe
+  pas dans le chroot cible utilisé par Calamares (pas de vrai `systemd`
+  PID 1, donc pas de bus système actif). Confirmé en conditions réelles :
+  la jonction échouait systématiquement avec `realm: Couldn't connect to
+  system bus: Could not connect: No such file or directory` (et
+  `hostnamectl` avec `System has not been booted with systemd as init
+  system (PID 1)`), alors même que `realm list` (côté live, avant install)
+  ne montrait donc jamais rien et qu'aucune machine n'apparaissait dans
+  l'annuaire AD - pas un souci réseau/Kerberos/identifiants, un simple
+  problème d'environnement d'exécution. `realm` documente lui-même la
+  solution dans son propre message d'erreur : `--install=DIR` fait
+  opérer `realm`/`adcli` directement sur le système cible (ici `/`, déjà la
+  racine vue depuis ce chroot) sans passer par `realmd`/D-Bus - c'est le
+  mécanisme prévu précisément pour les installations hors-ligne/chroot.
 - Le mot de passe est effacé de `GlobalStorage` dès qu'il a été lu, avant
   même d'exécuter `realm join`.
 - **Best-effort par conception** : si `realm join` échoue, le job journalise

@@ -47,14 +47,25 @@ def run():
         )
         return None
 
-    libcalamares.utils.target_env_call(["hostnamectl", "set-hostname", computer_name])
+    # Pas de hostnamectl ici : le hostname est déjà positionné par le module
+    # Calamares "users" avant que ce job ne s'exécute, et hostnamectl échoue
+    # de toute façon dans ce chroot (voir note --install= ci-dessous - même
+    # cause : pas de D-Bus système/systemd PID 1 disponible).
 
     # Kerberos est sensible au décalage d'horloge : on force une synchro
     # ponctuelle avant la jonction (chronyd est déjà activé par
     # services-systemd, voir airootfs/etc/calamares/modules/services-systemd.conf).
     libcalamares.utils.target_env_call(["chronyd", "-q"], "", 30)
 
-    join_cmd = ["realm", "join", "--user", admin_user, "--verbose"]
+    # --install=/ : indispensable dans ce contexte. `realm join` cherche par
+    # défaut à parler à realmd via D-Bus système, qui n'existe pas dans le
+    # chroot cible utilisé par Calamares (pas de vrai systemd PID 1) - confirmé
+    # par un premier échec en conditions réelles : "realm: Couldn't connect to
+    # system bus" (avec le message d'aide de realm lui-même : "To run without
+    # a DBus bus use the install mode: --install=/"). Ce mode fait exactement
+    # ce qu'il faut ici : opérer directement sur "/" (déjà la racine du
+    # système cible, du point de vue de ce chroot) sans passer par realmd.
+    join_cmd = ["realm", "join", "--install=/", "--user", admin_user, "--verbose"]
     if ou:
         join_cmd += ["--computer-ou", ou]
     join_cmd.append(domain)
