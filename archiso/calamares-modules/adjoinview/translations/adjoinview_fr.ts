@@ -71,6 +71,22 @@
         <translation>Nom de cet ordinateur</translation>
     </message>
     <message>
+        <source>AD group allowed to log in (optional)</source>
+        <translation>Groupe AD autorisé à se connecter (optionnel)</translation>
+    </message>
+    <message>
+        <source>leave empty to allow any domain account</source>
+        <translation>laisser vide pour autoriser tout compte du domaine</translation>
+    </message>
+    <message>
+        <source>AD group with sudo/admin rights (optional)</source>
+        <translation>Groupe AD avec droits sudo/admin (optionnel)</translation>
+    </message>
+    <message>
+        <source>leave empty to grant no automatic sudo rights</source>
+        <translation>laisser vide pour n'accorder aucun droit sudo automatique</translation>
+    </message>
+    <message>
         <source>Domain, admin username, password, and computer name are all required to continue.</source>
         <translation>Domaine, utilisateur admin, mot de passe et nom de machine sont requis pour continuer.</translation>
     </message>

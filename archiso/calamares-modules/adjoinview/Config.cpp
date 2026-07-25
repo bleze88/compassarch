@@ -84,6 +84,30 @@ Config::computerNameLabel() const
 }
 
 QString
+Config::allowedGroupLabel() const
+{
+    return tr( "AD group allowed to log in (optional)" );
+}
+
+QString
+Config::allowedGroupPlaceholder() const
+{
+    return tr( "leave empty to allow any domain account" );
+}
+
+QString
+Config::sudoGroupLabel() const
+{
+    return tr( "AD group with sudo/admin rights (optional)" );
+}
+
+QString
+Config::sudoGroupPlaceholder() const
+{
+    return tr( "leave empty to grant no automatic sudo rights" );
+}
+
+QString
 Config::validationErrorText() const
 {
     return tr( "Domain, admin username, password, and computer name are all required to continue." );
@@ -236,6 +260,26 @@ Config::setComputerName( const QString& computerName )
 }
 
 void
+Config::setAllowedGroup( const QString& allowedGroup )
+{
+    if ( m_allowedGroup != allowedGroup )
+    {
+        m_allowedGroup = allowedGroup;
+        emit allowedGroupChanged( m_allowedGroup );
+    }
+}
+
+void
+Config::setSudoGroup( const QString& sudoGroup )
+{
+    if ( m_sudoGroup != sudoGroup )
+    {
+        m_sudoGroup = sudoGroup;
+        emit sudoGroupChanged( m_sudoGroup );
+    }
+}
+
+void
 Config::prefillComputerName()
 {
     if ( !m_computerName.isEmpty() )
@@ -259,6 +303,8 @@ Config::commitToGlobalStorage()
     adjoin.insert( "adminUser", m_adminUser.trimmed() );
     adjoin.insert( "adminPassword", m_adminPassword );
     adjoin.insert( "computerName", m_computerName.trimmed() );
+    adjoin.insert( "allowedGroup", m_allowedGroup.trimmed() );
+    adjoin.insert( "sudoGroup", m_sudoGroup.trimmed() );
 
     auto* gs = Calamares::JobQueue::instance()->globalStorage();
     if ( gs )

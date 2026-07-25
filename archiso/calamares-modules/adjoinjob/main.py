@@ -12,6 +12,11 @@ Best-effort par conception (voir docs/AD-JOIN-MODULE.md) : un échec de
 jonction ne bloque pas le reste de l'installation, il est seulement
 journalisé. L'utilisateur peut toujours faire `realm join` manuellement
 après le premier démarrage.
+
+Optionnellement, restreint la connexion à un groupe AD (`realm permit
+--groups`) et/ou accorde sudo à un groupe AD (fragment /etc/sudoers.d/)
+si ces champs ont été renseignés dans la page - vides par défaut, aucun
+changement de comportement si non utilisés.
 """
 
 import libcalamares
@@ -34,6 +39,8 @@ def run():
     admin_user = (adjoin.get("adminUser") or "").strip()
     admin_password = adjoin.get("adminPassword") or ""
     computer_name = (adjoin.get("computerName") or "").strip()
+    allowed_group = (adjoin.get("allowedGroup") or "").strip()
+    sudo_group = (adjoin.get("sudoGroup") or "").strip()
 
     # Le mot de passe n'est utile qu'une fois ; on l'efface de GlobalStorage
     # dès qu'il est capturé dans la variable locale ci-dessus.
@@ -124,4 +131,52 @@ def run():
 
     libcalamares.utils.target_env_call(["systemctl", "enable", "sssd.service"])
     libcalamares.utils.debug("adjoinjob: jonction au domaine {} réussie.".format(domain))
+
+    # Restriction de connexion (optionnelle) : par défaut, N'IMPORTE QUEL
+    # compte du domaine peut se connecter une fois la jonction faite (aucune
+    # restriction dans sssd.conf/NSS) - voir docs/AD-JOIN-MODULE.md. Si un
+    # groupe a été renseigné, on utilise `realm permit`/`deny` plutôt que
+    # d'éditer sssd.conf à la main : c'est l'outil prévu pour ça, il
+    # regénère la config sssd correctement.
+    if allowed_group:
+        try:
+            libcalamares.utils.check_target_env_output(["realm", "deny", "--all"], "", 30)
+            libcalamares.utils.check_target_env_output(
+                ["realm", "permit", "--groups", allowed_group], "", 30
+            )
+            libcalamares.utils.debug(
+                "adjoinjob: connexion restreinte au groupe AD '{}'.".format(allowed_group)
+            )
+        except Exception as exc:
+            libcalamares.utils.warning(
+                "adjoinjob: échec de la restriction de connexion au groupe '{}' : {}".format(
+                    allowed_group, getattr(exc, "output", str(exc))
+                )
+            )
+
+    # Droits sudo (optionnels) : aucun compte AD n'a sudo automatiquement
+    # sinon (seul le groupe local "wheel" en a, voir packages.x86_64/
+    # customize_airootfs.sh). Le fragment est d'abord écrit dans un fichier
+    # .tmp et validé avec `visudo -cf` avant d'être activé (permissions
+    # 0440) - pour ne jamais risquer de casser sudo avec une syntaxe
+    # invalide (ex: nom de groupe AD contenant des caractères spéciaux).
+    if sudo_group:
+        sudoers_tmp = "/etc/sudoers.d/90-ad-admins.tmp"
+        sudoers_final = "/etc/sudoers.d/90-ad-admins"
+        sudoers_line = "%{} ALL=(ALL:ALL) ALL\n".format(sudo_group)
+        libcalamares.utils.target_env_call(["sh", "-c", "cat > " + sudoers_tmp], sudoers_line)
+        check = libcalamares.utils.target_env_call(["visudo", "-cf", sudoers_tmp])
+        if check == 0:
+            libcalamares.utils.target_env_call(
+                ["sh", "-c", "chmod 0440 {0} && mv {0} {1}".format(sudoers_tmp, sudoers_final)]
+            )
+            libcalamares.utils.debug(
+                "adjoinjob: droits sudo accordés au groupe AD '{}'.".format(sudo_group)
+            )
+        else:
+            libcalamares.utils.target_env_call(["rm", "-f", sudoers_tmp])
+            libcalamares.utils.warning(
+                "adjoinjob: nom de groupe sudo '{}' invalide pour sudoers, ignoré.".format(sudo_group)
+            )
+
     return None

@@ -99,6 +99,24 @@ Page {
                 text: config.computerName
                 onTextEdited: config.computerName = text
             }
+
+            Label { text: config.allowedGroupLabel }
+            TextField {
+                id: allowedGroupField
+                Layout.fillWidth: true
+                text: config.allowedGroup
+                placeholderText: config.allowedGroupPlaceholder
+                onTextEdited: config.allowedGroup = text
+            }
+
+            Label { text: config.sudoGroupLabel }
+            TextField {
+                id: sudoGroupField
+                Layout.fillWidth: true
+                text: config.sudoGroup
+                placeholderText: config.sudoGroupPlaceholder
+                onTextEdited: config.sudoGroup = text
+            }
         }
 
         Label {

@@ -9,9 +9,11 @@ Deux modules Calamares custom, dans `archiso/calamares-modules/` :
   [calamares-extensions](https://github.com/calamares/calamares-extensions/tree/master/modules/mobile).
 - `Config.h/.cpp` : expose à QML (sous le nom `config`) les propriétés
   `enabled`, `domain`, `ou`, `adminUser`, `adminPassword`, `computerName`,
-  une propriété calculée `isValid`, et tous les **textes affichés** de la
-  page (`pageTitle`, `pageDescription`, `joinCheckboxText`, `domainLabel`,
-  etc. - voir la liste complète dans `Config.h`).
+  `allowedGroup`, `sudoGroup` (ces deux derniers optionnels, voir
+  "Restriction d'accès et sudo" ci-dessous), une propriété calculée
+  `isValid`, et tous les **textes affichés** de la page (`pageTitle`,
+  `pageDescription`, `joinCheckboxText`, `domainLabel`, etc. - voir la
+  liste complète dans `Config.h`).
 - `adjoinview.qml` : le formulaire, purement déclaratif - chaque `Label`/
   `placeholderText` est bindé à `config.xxx`, jamais à un `qsTr()` direct
   (voir "Traductions" ci-dessous pour le pourquoi). Case à cocher
@@ -131,6 +133,34 @@ Deux modules Calamares custom, dans `archiso/calamares-modules/` :
   de la jonction se vérifie directement : `realm list` (domaines rejoints),
   `journalctl -u sssd`, et `/var/log/sssd/*.log` (le plus détaillé pour les
   problèmes Kerberos/LDAP spécifiquement).
+
+## Restriction d'accès et sudo (optionnel)
+
+**Par défaut, sans configuration supplémentaire, n'importe quel compte du
+domaine AD peut se connecter sur le poste une fois la jonction faite**
+(aucune restriction dans NSS/sssd), et **aucun compte AD n'a `sudo`
+automatiquement** (seul le groupe local `wheel` en a - voir
+`packages.x86_64`/`customize_airootfs.sh`). C'est un point de sécurité
+important à connaître avant de déployer en production.
+
+Deux champs optionnels dans la page `adjoinview` permettent de couvrir ça
+sans avoir à deviner les noms de groupes d'un annuaire (chaque AD a les
+siens) :
+- **Groupe AD autorisé à se connecter** (`allowedGroup`) : si renseigné,
+  `adjoinjob` exécute `realm deny --all` puis `realm permit --groups
+  <groupe>` après la jonction - la commande `realm` prévue pour ça plutôt
+  qu'éditer `sssd.conf` à la main (elle régénère la config sssd
+  correctement). Laissé vide, comportement inchangé (tout compte autorisé).
+- **Groupe AD avec droits sudo** (`sudoGroup`) : si renseigné, écrit
+  `%<groupe> ALL=(ALL:ALL) ALL` dans `/etc/sudoers.d/90-ad-admins`.
+  Validé avec `visudo -cf` sur un fichier `.tmp` **avant** d'être activé
+  (`chmod 0440` + renommage) - un nom de groupe AD invalide pour la
+  syntaxe sudoers ne peut donc jamais casser `sudo` sur le système
+  installé, l'erreur est seulement journalisée.
+
+Les deux sont **best-effort**, comme la jonction elle-même : un échec
+n'interrompt pas l'installation, juste un avertissement dans le log de
+session Calamares (voir ci-dessus).
 
 ## NSS / PAM (statique, hors du module)
 

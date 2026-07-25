@@ -20,6 +20,13 @@ class Config : public QObject
     Q_PROPERTY( QString adminPassword READ adminPassword WRITE setAdminPassword NOTIFY adminPasswordChanged )
     Q_PROPERTY( QString computerName READ computerName WRITE setComputerName NOTIFY computerNameChanged )
 
+    // Tous deux optionnels, vides par défaut = comportement inchangé (tout
+    // compte du domaine peut se connecter, aucun n'a sudo automatiquement -
+    // voir docs/AD-JOIN-MODULE.md "Restriction d'accès et sudo"). Chaque
+    // annuaire AD a ses propres noms de groupes, impossible à deviner ici.
+    Q_PROPERTY( QString allowedGroup READ allowedGroup WRITE setAllowedGroup NOTIFY allowedGroupChanged )
+    Q_PROPERTY( QString sudoGroup READ sudoGroup WRITE setSudoGroup NOTIFY sudoGroupChanged )
+
     // true si "enabled" est faux (rien à valider) ou si tous les champs
     // requis sont renseignés. Lu par ADJoinQmlViewStep::isNextEnabled() et
     // bindé en QML pour griser le bouton Suivant / afficher les erreurs.
@@ -43,6 +50,10 @@ class Config : public QObject
     Q_PROPERTY( QString adminUserPlaceholder READ adminUserPlaceholder NOTIFY translationsChanged )
     Q_PROPERTY( QString adminPasswordLabel READ adminPasswordLabel NOTIFY translationsChanged )
     Q_PROPERTY( QString computerNameLabel READ computerNameLabel NOTIFY translationsChanged )
+    Q_PROPERTY( QString allowedGroupLabel READ allowedGroupLabel NOTIFY translationsChanged )
+    Q_PROPERTY( QString allowedGroupPlaceholder READ allowedGroupPlaceholder NOTIFY translationsChanged )
+    Q_PROPERTY( QString sudoGroupLabel READ sudoGroupLabel NOTIFY translationsChanged )
+    Q_PROPERTY( QString sudoGroupPlaceholder READ sudoGroupPlaceholder NOTIFY translationsChanged )
     Q_PROPERTY( QString validationErrorText READ validationErrorText NOTIFY translationsChanged )
     Q_PROPERTY( QString retryNoteText READ retryNoteText NOTIFY translationsChanged )
 
@@ -55,6 +66,8 @@ public:
     QString adminUser() const { return m_adminUser; }
     QString adminPassword() const { return m_adminPassword; }
     QString computerName() const { return m_computerName; }
+    QString allowedGroup() const { return m_allowedGroup; }
+    QString sudoGroup() const { return m_sudoGroup; }
     bool isValid() const;
 
     QString pageTitle() const;
@@ -68,6 +81,10 @@ public:
     QString adminUserPlaceholder() const;
     QString adminPasswordLabel() const;
     QString computerNameLabel() const;
+    QString allowedGroupLabel() const;
+    QString allowedGroupPlaceholder() const;
+    QString sudoGroupLabel() const;
+    QString sudoGroupPlaceholder() const;
     QString validationErrorText() const;
     QString retryNoteText() const;
 
@@ -77,6 +94,8 @@ public:
     void setAdminUser( const QString& adminUser );
     void setAdminPassword( const QString& adminPassword );
     void setComputerName( const QString& computerName );
+    void setAllowedGroup( const QString& allowedGroup );
+    void setSudoGroup( const QString& sudoGroup );
 
     // Appelé une fois par ADJoin.qml (Component.onCompleted) pour préremplir
     // le nom de machine avec celui déjà saisi dans la page "users" - lu à la
@@ -105,6 +124,8 @@ signals:
     void adminUserChanged( QString adminUser );
     void adminPasswordChanged( QString adminPassword );
     void computerNameChanged( QString computerName );
+    void allowedGroupChanged( QString allowedGroup );
+    void sudoGroupChanged( QString sudoGroup );
     void validityChanged( bool isValid );
     void translationsChanged();
 
@@ -115,5 +136,7 @@ private:
     QString m_adminUser;
     QString m_adminPassword;
     QString m_computerName;
+    QString m_allowedGroup;
+    QString m_sudoGroup;
     QString m_loadedLangCode;
 };
