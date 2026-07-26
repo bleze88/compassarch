@@ -200,6 +200,26 @@ Les deux sont **best-effort**, comme la jonction elle-même : un échec
 n'interrompt pas l'installation, juste un avertissement dans le log de
 session Calamares (voir ci-dessus).
 
+## Piège annexe - horloge VMware vs chronyd (fait planter sssd)
+
+Confirmé en conditions réelles sur une VM VMware : la jonction AD réussit
+et `id <user>@domaine` fonctionne, mais **toute connexion échoue** (SDDM,
+`su`) et le backend `sssd` (`sssd_be`) redémarre en boucle, tué par son
+propre watchdog toutes les ~30 secondes, sans erreur explicite dans son
+log (juste "Entering main loop" puis silence jusqu'au kill suivant).
+Cause : **VMware Tools a sa propre synchronisation d'horloge avec l'hôte**,
+active par défaut (`open-vm-tools`, voir `packages.x86_64`), qui entre en
+conflit avec `chronyd` (déjà activé pour Kerberos, voir
+`services-systemd.conf`) - les deux mécanismes ajustent l'horloge en
+parallèle, se marchant dessus (`chronyd` le détecte lui-même : "System
+clock interference detected (another NTP client?)"). L'horloge saute en
+continu, ce qui perturbe suffisamment `sssd_be` pour le faire planter, et
+casse Kerberos (protocole très sensible aux écarts d'horloge) même
+lorsque le processus survit. Fix : `airootfs/etc/vmware-tools/tools.conf`
+désactive la synchro VMware (`[timesync] disable = TRUE`) - sans effet si
+la machine ne tourne pas sous VMware, `chronyd` reste la seule source de
+vérité pour l'heure sur toute installation Compass Arch.
+
 ## NSS / PAM (statique, hors du module)
 
 Le câblage SSSD dans NSS/PAM n'est **pas** fait par `adjoinjob` (il doit
