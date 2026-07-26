@@ -104,7 +104,7 @@ Config::sudoGroupLabel() const
 QString
 Config::sudoGroupPlaceholder() const
 {
-    return tr( "leave empty to grant no automatic sudo rights" );
+    return tr( "group name only, domain is added automatically" );
 }
 
 QString

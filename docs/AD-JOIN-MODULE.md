@@ -174,11 +174,27 @@ siens) :
   qu'éditer `sssd.conf` à la main (elle régénère la config sssd
   correctement). Laissé vide, comportement inchangé (tout compte autorisé).
 - **Groupe AD avec droits sudo** (`sudoGroup`) : si renseigné, écrit
-  `%<groupe> ALL=(ALL:ALL) ALL` dans `/etc/sudoers.d/90-ad-admins`.
-  Validé avec `visudo -cf` sur un fichier `.tmp` **avant** d'être activé
-  (`chmod 0440` + renommage) - un nom de groupe AD invalide pour la
-  syntaxe sudoers ne peut donc jamais casser `sudo` sur le système
+  `%<groupe>@<domaine> ALL=(ALL:ALL) ALL` dans
+  `/etc/sudoers.d/90-ad-admins` (le domaine est toujours ajouté par le
+  code, voir piège ci-dessous - inutile de le saisir soi-même, et sans
+  effet si déjà présent). Validé avec `visudo -cf` sur un fichier `.tmp`
+  **avant** d'être activé (`chmod 0440` + renommage) - une syntaxe
+  sudoers invalide ne peut donc jamais casser `sudo` sur le système
   installé, l'erreur est seulement journalisée.
+
+  **Piège critique - `sudo` a besoin du nom de groupe *qualifié*, contrairement
+  à `realm permit`** : confirmé en conditions réelles sur une machine déjà
+  jointe - `realm permit --groups g_linux` fonctionne très bien avec le nom
+  court (realm fait sa propre résolution côté AD), mais `sudo`/`visudo`
+  matchent un groupe via `getgrnam()` (résolution **NSS**), qui - avec
+  `use_fully_qualified_names` (activé par défaut dans le `sssd.conf` généré
+  par `realm join` avec le provider AD) - ne reconnaît QUE la forme
+  qualifiée : `getent group g_linux` ne renvoie rien, seul `getent group
+  g_linux@montferrini.local` fonctionne. Un admin qui saisirait le même nom
+  court dans les deux champs verrait donc la restriction de connexion
+  marcher mais le sudo échouer silencieusement (`visudo -cf` ne valide que
+  la syntaxe, pas l'existence réelle du groupe). D'où la qualification
+  automatique par le code, indépendante de ce que l'admin tape.
 
 Les deux sont **best-effort**, comme la jonction elle-même : un échec
 n'interrompt pas l'installation, juste un avertissement dans le log de

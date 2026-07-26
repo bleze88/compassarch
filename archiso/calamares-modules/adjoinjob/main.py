@@ -190,10 +190,24 @@ def run():
     # .tmp et validé avec `visudo -cf` avant d'être activé (permissions
     # 0440) - pour ne jamais risquer de casser sudo avec une syntaxe
     # invalide (ex: nom de groupe AD contenant des caractères spéciaux).
+    #
+    # Piège vécu en conditions réelles : `sudo`/`visudo` matchent le groupe
+    # via getgrnam() (résolution NSS), qui - avec `use_fully_qualified_names`
+    # (activé par défaut par `realm join` avec le provider AD) - ne reconnaît
+    # QUE la forme qualifiée "groupe@domaine" ("getent group g_linux" ne
+    # renvoie rien, seul "getent group g_linux@montferrini.local" fonctionne),
+    # alors que `realm permit --groups` (ci-dessus) accepte très bien le nom
+    # court (résolution AD interne, indépendante de NSS). Un admin tapant le
+    # même nom court dans les deux champs verrait donc la restriction de
+    # connexion fonctionner mais le sudo échouer silencieusement (visudo -cf
+    # valide la SYNTAXE, pas l'existence du groupe). On qualifie donc
+    # toujours nous-mêmes avec le domaine de la jonction, quel que soit ce
+    # que l'admin a saisi (avec ou sans @domaine déjà présent).
     if sudo_group:
+        sudo_group_qualified = "{}@{}".format(sudo_group.split("@", 1)[0], domain)
         sudoers_tmp = "/etc/sudoers.d/90-ad-admins.tmp"
         sudoers_final = "/etc/sudoers.d/90-ad-admins"
-        sudoers_line = "%{} ALL=(ALL:ALL) ALL\n".format(sudo_group)
+        sudoers_line = "%{} ALL=(ALL:ALL) ALL\n".format(sudo_group_qualified)
         libcalamares.utils.target_env_call(["sh", "-c", "cat > " + sudoers_tmp], sudoers_line)
         check = libcalamares.utils.target_env_call(["visudo", "-cf", sudoers_tmp])
         if check == 0:
@@ -201,12 +215,12 @@ def run():
                 ["sh", "-c", "chmod 0440 {0} && mv {0} {1}".format(sudoers_tmp, sudoers_final)]
             )
             libcalamares.utils.debug(
-                "adjoinjob: droits sudo accordés au groupe AD '{}'.".format(sudo_group)
+                "adjoinjob: droits sudo accordés au groupe AD '{}'.".format(sudo_group_qualified)
             )
         else:
             libcalamares.utils.target_env_call(["rm", "-f", sudoers_tmp])
             libcalamares.utils.warning(
-                "adjoinjob: nom de groupe sudo '{}' invalide pour sudoers, ignoré.".format(sudo_group)
+                "adjoinjob: nom de groupe sudo '{}' invalide pour sudoers, ignoré.".format(sudo_group_qualified)
             )
 
     return None

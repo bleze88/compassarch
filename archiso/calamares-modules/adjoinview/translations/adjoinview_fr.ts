@@ -83,8 +83,8 @@
         <translation>Groupe AD avec droits sudo/admin (optionnel)</translation>
     </message>
     <message>
-        <source>leave empty to grant no automatic sudo rights</source>
-        <translation>laisser vide pour n'accorder aucun droit sudo automatique</translation>
+        <source>group name only, domain is added automatically</source>
+        <translation>nom du groupe seul, le domaine est ajouté automatiquement</translation>
     </message>
     <message>
         <source>Domain, admin username, password, and computer name are all required to continue.</source>
