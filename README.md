@@ -41,6 +41,17 @@ sudo ./build/build.sh
 
 L'ISO finale se trouve dans `build/out/`.
 
+## Secure Boot
+
+**Secure Boot doit être désactivé** dans le firmware (BIOS/UEFI) avant de
+démarrer sur l'ISO, aussi bien pour le live que pour le système une fois
+installé. Ni le live (systemd-boot/syslinux) ni GRUB (installé par
+Calamares) ne sont signés pour Secure Boot - c'est le cas de la plupart
+des distributions basées sur Arch sans outillage dédié (Manjaro,
+EndeavourOS...). Sur un PC récent (Secure Boot souvent activé par défaut
+en sortie d'usine), désactiver cette option dans les réglages du firmware
+avant de démarrer sur la clé/l'ISO.
+
 ## Renommer le projet
 
 Toute l'identité de la distribution (nom affiché, id court, étiquette ISO,
