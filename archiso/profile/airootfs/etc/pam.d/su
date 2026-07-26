@@ -1,0 +1,25 @@
+#%PAM-1.0
+#
+# Dérivé du su fourni par pambase, avec l'authentification/gestion de
+# compte/session redirigées vers system-auth (comme le fait déjà sudo -
+# voir docs/AD-JOIN-MODULE.md) plutôt que pam_unix.so seul.
+#
+# Piège rencontré en conditions réelles : la version stock ne route
+# system-auth QUE pour la pile "password" ; "auth"/"account"/"session"
+# restaient figées sur pam_unix.so (comptes locaux uniquement), donc
+# `su - <utilisateur AD>` échouait instantanément ("Échec de
+# l'authentification") SANS JAMAIS consulter sssd - confirmé par
+# l'absence totale de trace du compte AD dans
+# /var/log/sssd/sssd_pam.log lors d'un essai, alors que `sudo` (déjà
+# correctement câblé vers system-auth dans son propre fichier PAM,
+# fourni par le paquet sudo) fonctionnait normalement pour le même
+# compte.
+auth            sufficient      pam_rootok.so
+# Uncomment the following line to implicitly trust users in the "wheel" group.
+#auth           sufficient      pam_wheel.so trust use_uid
+# Uncomment the following line to require a user to be in the "wheel" group.
+#auth           required        pam_wheel.so use_uid
+auth            include         system-auth
+account         include         system-auth
+session         include         system-auth
+password        include         system-auth
