@@ -248,6 +248,22 @@ Fix (deux mécanismes complémentaires, tous deux après `users` et avant
    `/home/*/Desktop/` (déjà copiée dans le compte que `users` vient de
    créer, puisque ce module tourne avant ce script dans la séquence).
 
+**Faille de sécurité évitée par le même mécanisme** : `root/customize_airootfs.sh`
+accorde du sudo **sans mot de passe** à tout le groupe `wheel`
+(`/etc/sudoers.d/99-liveuser`, `%wheel ALL=(ALL:ALL) NOPASSWD: ALL`), pour
+la commodité de la session live (partitionnement, lancement de Calamares
+sans taper de mot de passe). Le module Calamares `users`
+(`sudoersGroup: wheel` dans `users.conf`) écrit lui-même sa propre règle
+`%wheel ALL=(ALL:ALL) ALL` (avec mot de passe, celle-là) pour le compte
+qu'il crée - mais comme `unpackfs` copie aussi `99-liveuser` tel quel sur
+la cible, et que `sudo` retient la **dernière** règle correspondante
+parmi tous les fichiers de `/etc/sudoers.d/` (`99-liveuser` triait après
+la règle de Calamares), le compte admin installé se retrouvait avec
+`sudo` **sans aucune demande de mot de passe** - un vrai problème de
+sécurité, découvert et signalé par l'utilisateur en testant l'ISO.
+`remove-live-artifacts.sh` supprime donc aussi `99-liveuser`, laissant
+uniquement la règle avec mot de passe de Calamares en vigueur.
+
 Le splash GRUB (`GRUB_BACKGROUND`, image dans `airootfs/boot/grub/splash.png`)
 et `GRUB_CMDLINE_LINUX_DEFAULT="... splash"` (pour activer Plymouth), eux,
 n'ont pas ce problème : `/etc/default/grub` n'est utilisé qu'au moment où

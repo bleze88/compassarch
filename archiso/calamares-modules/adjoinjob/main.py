@@ -349,4 +349,41 @@ def run():
                 "adjoinjob: nom de groupe sudo '{}' invalide pour sudoers, ignoré.".format(sudo_group_short)
             )
 
+    # Écran de connexion SDDM en saisie libre (nom d'utilisateur + mot de
+    # passe, comme sur Windows) plutôt qu'une liste de comptes cliquables -
+    # demandé par l'utilisateur après avoir remarqué qu'un compte AD (non
+    # énuméré par sssd, voir plus haut) n'apparaît jamais dans cette liste,
+    # qui ne montre donc que le compte local créé par le module Calamares
+    # "users". Confirmé fonctionnel en conditions réelles : masquer ce seul
+    # compte local (`HideUsers`) fait basculer SDDM en saisie manuelle du
+    # nom d'utilisateur (le thème Breeze bascule automatiquement en champ
+    # de texte quand la liste est vide) - `RememberLastUser=false` en plus
+    # pour que ce champ ne reste pas pré-rempli avec le dernier utilisateur
+    # connecté (un premier essai avec seulement `HideUsers`, dans un
+    # fichier séparé ajouté ensuite, n'a pas suffi : une deuxième section
+    # "[Users]" dans le même fichier écrasait apparemment la première au
+    # lieu de fusionner - d'où l'écriture groupée des deux clés dans une
+    # seule section ci-dessous).
+    #
+    # Seulement si la jonction AD a été demandée : sur une install sans AD,
+    # cacher le seul compte local existant serait contre-productif (plus
+    # aucun moyen simple de se connecter depuis l'écran de bienvenue).
+    local_username = (gs.value("username") or "").strip()
+    if local_username:
+        sddm_conf = "[Users]\nHideUsers={}\nRememberLastUser=false\n".format(local_username)
+        libcalamares.utils.target_env_call(["mkdir", "-p", "/etc/sddm.conf.d"])
+        libcalamares.utils.target_env_call(
+            ["sh", "-c", "cat > /etc/sddm.conf.d/90-hide-local-user.conf"], sddm_conf
+        )
+        libcalamares.utils.debug(
+            "adjoinjob: écran SDDM basculé en saisie libre (compte local '{}' masqué de la liste).".format(
+                local_username
+            )
+        )
+    else:
+        libcalamares.utils.warning(
+            "adjoinjob: nom d'utilisateur local introuvable dans GlobalStorage, "
+            "écran SDDM laissé en mode liste."
+        )
+
     return None

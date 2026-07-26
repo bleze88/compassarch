@@ -341,6 +341,36 @@ ce symptôme réapparaît une troisième fois sur une plateforme différente,
 chercher un mécanisme de synchro horloge concurrent avant toute autre
 piste.
 
+## Écran de connexion SDDM en saisie libre (comptes AD non listés)
+
+SDDM affiche par défaut une **liste** des comptes locaux connus
+(`/etc/passwd`) sur lesquels cliquer. Les comptes AD n'y apparaissent
+jamais : sssd ne supporte volontairement pas l'énumération complète d'un
+annuaire (`Enumeration requested but not enabled` dans ses logs) - un
+domaine peut compter des milliers de comptes, les lister tous n'aurait
+aucun sens. Résultat : après une jonction AD, l'écran de connexion ne
+montre que le compte local admin créé pendant l'install, ce qui peut
+laisser croire (à tort) qu'on ne peut pas se connecter avec un compte du
+domaine.
+
+Fix, appliqué par `adjoinjob` uniquement si la jonction AD a été demandée
+(sur une install sans AD, cacher le seul compte local existant serait
+contre-productif) : écrit `/etc/sddm.conf.d/90-hide-local-user.conf` avec
+`HideUsers=<compte local>` (lu dans `GlobalStorage["username"]`, écrit
+par le module Calamares `users`) et `RememberLastUser=false`. Le thème
+Breeze de SDDM bascule automatiquement en saisie manuelle du nom
+d'utilisateur (comme sur Windows) quand la liste de comptes affichables
+est vide - confirmé fonctionnel en conditions réelles.
+
+**Piège rencontré pendant la mise au point** : un premier essai avec
+seulement `HideUsers` dans un fichier, puis `RememberLastUser=false`
+ajouté *séparément* dans le **même fichier** via un `tee -a` (donc une
+deuxième section `[Users]` à la suite de la première), n'a pas
+fonctionné - le champ restait pré-rempli avec le dernier utilisateur
+connecté. Une seconde section `[Users]` dans un même fichier semble
+écraser la première plutôt que fusionner ses clés. Les deux réglages
+doivent être écrits ensemble, dans une seule section `[Users]`.
+
 ## NSS / PAM (statique, hors du module)
 
 Le câblage SSSD dans NSS/PAM n'est **pas** fait par `adjoinjob` (il doit

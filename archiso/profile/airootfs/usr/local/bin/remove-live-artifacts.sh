@@ -30,3 +30,14 @@ rm -f /etc/sddm.conf.d/20-liveuser-autologin.conf
 rm -f /usr/share/applications/install-distro.desktop
 rm -f /etc/skel/Desktop/install-distro.desktop
 rm -f /home/*/Desktop/install-distro.desktop
+
+# FAILLE DE SÉCURITÉ sinon laissée telle quelle : root/customize_airootfs.sh
+# accorde du sudo SANS mot de passe à tout le groupe "wheel"
+# (/etc/sudoers.d/99-liveuser, "%wheel ALL=(ALL:ALL) NOPASSWD: ALL") pour
+# la commodité de la session live (partitionnement, lancement de
+# Calamares... sans avoir à taper de mot de passe). Comme pour les autres
+# artefacts ci-dessus, unpackfs copie ce fichier tel quel sur la cible - où
+# le compte admin créé par le module Calamares "users" est justement
+# membre de "wheel" (voir "users.conf"), héritant donc du même sudo sans
+# mot de passe une fois installé si on ne le retire pas explicitement ici.
+rm -f /etc/sudoers.d/99-liveuser
