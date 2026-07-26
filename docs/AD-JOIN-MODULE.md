@@ -71,6 +71,12 @@ Deux modules Calamares custom, dans `archiso/calamares-modules/` :
      avec le mot de passe transmis **par stdin** (jamais en argument de
      commande visible dans `/proc`, jamais écrit sur disque)
   5. `systemctl enable sssd.service`
+  6. Fige le KDC découvert via son enregistrement DNS SRV dans
+     `/etc/krb5.conf` (`[realms]`/`[domain_realm]`) - voir piège mDNS
+     ci-dessous pour le contexte ; best-effort, sans effet si `dig` ne
+     renvoie rien.
+  7. Réécrit `use_fully_qualified_names`/`case_sensitive` dans
+     `sssd.conf` (voir plus bas).
 
   **Piège critique - le hostname envoyé à l'AD n'est pas celui de
   `/etc/hostname` de la cible** : `realm join`/`adcli` déterminent le nom
@@ -268,6 +274,31 @@ nécessitant un redémarrage forcé perd tous les logs du démarrage
 incriminé. Voir `etc/systemd/journald.conf.d/persistent-storage.conf`
 (`Storage=persistent`), ajouté suite à exactement ce problème rencontré
 pendant cette investigation.
+
+## Piège annexe - mDNS vs domaines AD en ".local"
+
+De nombreux domaines Active Directory historiques utilisent le suffixe
+`.local` (convention héritée de Windows Server 2000/2003) - or `.local`
+est réservé au mDNS (RFC 6762 - confirmé par un avertissement de `dig`
+lui-même : "WARNING: .local is reserved for Multicast DNS"). Avec le mDNS
+de `systemd-resolved` activé, toute résolution DNS d'un tel domaine
+déclenche EN PLUS une requête mDNS parallèle qui traîne plusieurs
+secondes avant d'abandonner faute de réponse - observé en conditions
+réelles comme une négociation GSSAPI anormalement longue (~25 secondes,
+proche du timeout du watchdog `sssd_be`, voir section suivante) lors de
+la connexion au contrôleur de domaine. Fix :
+`airootfs/etc/systemd/resolved.conf.d/no-mdns.conf`
+(`MulticastDNS=no`) - **piège annexe** : le profil `releng` d'origine
+d'archiso fournit déjà un fragment
+`etc/systemd/resolved.conf.d/archiso.conf` qui active explicitement le
+mDNS pour le live (`MulticastDNS=yes`, pour la découverte réseau locale
+en session live) ; comme les fragments `resolved.conf.d/` se chargent
+par ordre alphabétique et que chaque directive répétée écrase la
+précédente, notre fichier (`no-mdns.conf`, après `archiso.conf`
+alphabétiquement) l'emporte correctement sans qu'il soit nécessaire de
+supprimer l'original - contrairement au piège `archiso.conf` de
+mkinitcpio (voir plus haut), où ce même mécanisme nous avait forcés à
+supprimer le fragment plutôt qu'à le surcharger.
 
 ## Piège annexe - horloges concurrentes vs chronyd (fait planter sssd)
 

@@ -162,6 +162,64 @@ def run():
     libcalamares.utils.target_env_call(["systemctl", "enable", "sssd.service"])
     libcalamares.utils.debug("adjoinjob: jonction au domaine {} réussie.".format(domain))
 
+    # `realm join` laisse /etc/krb5.conf au contenu par défaut du paquet
+    # `krb5` ([realms]/[domain_realm] avec des exemples MIT.EDU/CMU.EDU,
+    # aucune entrée pour notre propre domaine) - Kerberos retrouve quand
+    # même le KDC via découverte DNS (SRV) automatique, mais cette
+    # découverte répétée à chaque opération ajoute une dépendance de plus
+    # à un DNS qui peut être lent/perturbé (voir le piège mDNS/".local"
+    # documenté dans docs/AD-JOIN-MODULE.md). On fige donc explicitement le
+    # KDC trouvé via son enregistrement SRV, ce qui rend Kerberos
+    # indépendant de cette découverte pour les opérations suivantes.
+    # Best-effort : si `dig` échoue ou ne renvoie rien (domaine sans SRV,
+    # pas de `bind` installé...), on n'ajoute rien et on retombe sur la
+    # découverte DNS automatique de Kerberos, qui reste le comportement
+    # par défaut sans ce bloc.
+    try:
+        srv_output = libcalamares.utils.check_target_env_output(
+            ["sh", "-c", "dig +short SRV _kerberos._tcp.{} | sort -n | head -1".format(domain)],
+            "",
+            15,
+        )
+        kdc_host = srv_output.split()[-1].rstrip(".") if srv_output.strip() else ""
+    except Exception:
+        kdc_host = ""
+
+    if kdc_host:
+        try:
+            krb5_conf = libcalamares.utils.check_target_env_output(["cat", "/etc/krb5.conf"], "", 15)
+        except Exception:
+            krb5_conf = ""
+
+        if krb5_conf:
+            realm_upper = domain.upper()
+            realm_block = "    {} = {{\n        kdc = {}\n        admin_server = {}\n    }}\n".format(
+                realm_upper, kdc_host, kdc_host
+            )
+            domain_realm_block = "    .{0} = {1}\n    {0} = {1}\n".format(domain, realm_upper)
+
+            new_lines = []
+            for line in krb5_conf.splitlines(keepends=True):
+                new_lines.append(line)
+                stripped = line.strip()
+                if stripped == "[realms]":
+                    new_lines.append(realm_block)
+                elif stripped == "[domain_realm]":
+                    new_lines.append(domain_realm_block)
+            new_krb5_conf = "".join(new_lines)
+
+            libcalamares.utils.target_env_call(["sh", "-c", "cat > /etc/krb5.conf"], new_krb5_conf)
+            libcalamares.utils.debug(
+                "adjoinjob: KDC '{}' figé dans /etc/krb5.conf pour le royaume {}.".format(
+                    kdc_host, realm_upper
+                )
+            )
+    else:
+        libcalamares.utils.debug(
+            "adjoinjob: pas de KDC trouvé via SRV, /etc/krb5.conf laissé tel quel "
+            "(découverte DNS automatique de Kerberos utilisée à la place)."
+        )
+
     # `realm join` génère /etc/sssd/sssd.conf avec use_fully_qualified_names
     # à True par défaut - corrigé ici à False (login court "mtf0001" plutôt
     # que "mtf0001@domaine"), avec case_sensitive à False (AD est
