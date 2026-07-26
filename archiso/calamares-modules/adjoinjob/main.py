@@ -162,6 +162,79 @@ def run():
     libcalamares.utils.target_env_call(["systemctl", "enable", "sssd.service"])
     libcalamares.utils.debug("adjoinjob: jonction au domaine {} réussie.".format(domain))
 
+    # `realm join` génère /etc/sssd/sssd.conf avec use_fully_qualified_names
+    # à True par défaut - corrigé ici à False (login court "mtf0001" plutôt
+    # que "mtf0001@domaine"), avec case_sensitive à False (AD est
+    # intrinsèquement insensible à la casse). Confirmé en conditions
+    # réelles, dans cet ordre précis :
+    #   1. Avec use_fully_qualified_names=True (défaut), la connexion SDDM
+    #      pour un compte AD authentifiait correctement (pam_sss) mais la
+    #      session Plasma plantait juste après avec un écran noir - log
+    #      Wayland : "Could not create wayland socket", kwin_wayland tué
+    #      par SIGABRT. Cause racine (confirmée via `userdbctl user
+    #      <compte>` + `SYSTEMD_LOG_LEVEL=debug`) :
+    #      io.systemd.UserDatabase.ConflictingRecordFound - le multiplexeur
+    #      userdb de systemd fait une comparaison stricte, casse comprise,
+    #      entre le nom saisi et le nom canonique retourné par NSS/sssd, et
+    #      refuse l'enregistrement en cas de moindre différence (ici : la
+    #      casse saisie par l'utilisateur au login ne correspondait pas
+    #      exactement à celle stockée/retournée). pam_systemd traite cet
+    #      échec comme PAM_USER_UNKNOWN et retourne SANS créer
+    #      /run/user/<uid>, d'où le crash Wayland qui en dépend.
+    #   2. use_fully_qualified_names=False seul n'a pas suffi tant qu'une
+    #      DEUXIÈME occurrence de la clé (le "True" d'origine généré par
+    #      realm join, plus loin dans le fichier) restait présente - un
+    #      fichier ini avec une clé dupliquée garde la DERNIÈRE valeur, qui
+    #      gagnait alors sur celle qu'on venait d'insérer juste après l'en-
+    #      tête de section. D'où la réécriture complète ci-dessous (on
+    #      retire toute occurrence existante des deux clés avant de
+    #      réinjecter la nôtre une seule fois), plutôt qu'un simple ajout.
+    #   3. Une fois use_fully_qualified_names réellement à False (une seule
+    #      occurrence, sans le "True" fantôme), la connexion avec juste le
+    #      nom court ("mtf0001", en respectant sa casse canonique) a
+    #      fonctionné de bout en bout, session Plasma incluse.
+    # Documenté en détail dans docs/AD-JOIN-MODULE.md.
+    try:
+        conf = libcalamares.utils.check_target_env_output(["cat", "/etc/sssd/sssd.conf"], "", 15)
+    except Exception:
+        conf = ""
+
+    if conf:
+        domain_header = "[domain/{}]".format(domain.upper())
+        in_domain_section = False
+        filtered_lines = []
+        for line in conf.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("["):
+                in_domain_section = stripped == domain_header
+                filtered_lines.append(line)
+                continue
+            if in_domain_section and stripped.split("=", 1)[0].strip() in (
+                "use_fully_qualified_names",
+                "case_sensitive",
+            ):
+                continue  # retiré, réinjecté une seule fois juste après l'en-tête ci-dessous
+            filtered_lines.append(line)
+
+        final_lines = []
+        for line in filtered_lines:
+            final_lines.append(line)
+            if line.strip() == domain_header:
+                final_lines.append("use_fully_qualified_names = False")
+                final_lines.append("case_sensitive = False")
+        new_conf = "\n".join(final_lines) + "\n"
+
+        libcalamares.utils.target_env_call(["sh", "-c", "cat > /etc/sssd/sssd.conf"], new_conf)
+        libcalamares.utils.target_env_call(["chmod", "0600", "/etc/sssd/sssd.conf"])
+        libcalamares.utils.debug(
+            "adjoinjob: use_fully_qualified_names=False / case_sensitive=False appliqués à sssd.conf."
+        )
+    else:
+        libcalamares.utils.warning(
+            "adjoinjob: impossible de lire /etc/sssd/sssd.conf après la jonction, "
+            "réglages use_fully_qualified_names/case_sensitive non appliqués."
+        )
+
     # Restriction de connexion (optionnelle) : par défaut, N'IMPORTE QUEL
     # compte du domaine peut se connecter une fois la jonction faite (aucune
     # restriction dans sssd.conf/NSS) - voir docs/AD-JOIN-MODULE.md. Si un
@@ -191,23 +264,18 @@ def run():
     # 0440) - pour ne jamais risquer de casser sudo avec une syntaxe
     # invalide (ex: nom de groupe AD contenant des caractères spéciaux).
     #
-    # Piège vécu en conditions réelles : `sudo`/`visudo` matchent le groupe
-    # via getgrnam() (résolution NSS), qui - avec `use_fully_qualified_names`
-    # (activé par défaut par `realm join` avec le provider AD) - ne reconnaît
-    # QUE la forme qualifiée "groupe@domaine" ("getent group g_linux" ne
-    # renvoie rien, seul "getent group g_linux@montferrini.local" fonctionne),
-    # alors que `realm permit --groups` (ci-dessus) accepte très bien le nom
-    # court (résolution AD interne, indépendante de NSS). Un admin tapant le
-    # même nom court dans les deux champs verrait donc la restriction de
-    # connexion fonctionner mais le sudo échouer silencieusement (visudo -cf
-    # valide la SYNTAXE, pas l'existence du groupe). On qualifie donc
-    # toujours nous-mêmes avec le domaine de la jonction, quel que soit ce
-    # que l'admin a saisi (avec ou sans @domaine déjà présent).
+    # Nom COURT (pas de "@domaine") : `sudo`/`visudo` matchent le groupe via
+    # getgrnam() (résolution NSS), qui suit le réglage
+    # use_fully_qualified_names - forcé à False juste au-dessus - donc
+    # "getent group g_linux" (sans domaine) est la forme qui résout
+    # réellement. Avec l'ancien défaut (True) c'était l'inverse (il fallait
+    # "g_linux@domaine", voir l'historique dans docs/AD-JOIN-MODULE.md) -
+    # piège à surveiller si ce défaut est un jour rendu configurable.
     if sudo_group:
-        sudo_group_qualified = "{}@{}".format(sudo_group.split("@", 1)[0], domain)
+        sudo_group_short = sudo_group.split("@", 1)[0]
         sudoers_tmp = "/etc/sudoers.d/90-ad-admins.tmp"
         sudoers_final = "/etc/sudoers.d/90-ad-admins"
-        sudoers_line = "%{} ALL=(ALL:ALL) ALL\n".format(sudo_group_qualified)
+        sudoers_line = "%{} ALL=(ALL:ALL) ALL\n".format(sudo_group_short)
         libcalamares.utils.target_env_call(["sh", "-c", "cat > " + sudoers_tmp], sudoers_line)
         check = libcalamares.utils.target_env_call(["visudo", "-cf", sudoers_tmp])
         if check == 0:
@@ -215,12 +283,12 @@ def run():
                 ["sh", "-c", "chmod 0440 {0} && mv {0} {1}".format(sudoers_tmp, sudoers_final)]
             )
             libcalamares.utils.debug(
-                "adjoinjob: droits sudo accordés au groupe AD '{}'.".format(sudo_group_qualified)
+                "adjoinjob: droits sudo accordés au groupe AD '{}'.".format(sudo_group_short)
             )
         else:
             libcalamares.utils.target_env_call(["rm", "-f", sudoers_tmp])
             libcalamares.utils.warning(
-                "adjoinjob: nom de groupe sudo '{}' invalide pour sudoers, ignoré.".format(sudo_group_qualified)
+                "adjoinjob: nom de groupe sudo '{}' invalide pour sudoers, ignoré.".format(sudo_group_short)
             )
 
     return None

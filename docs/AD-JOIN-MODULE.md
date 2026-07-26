@@ -193,12 +193,81 @@ siens) :
   g_linux@montferrini.local` fonctionne. Un admin qui saisirait le même nom
   court dans les deux champs verrait donc la restriction de connexion
   marcher mais le sudo échouer silencieusement (`visudo -cf` ne valide que
-  la syntaxe, pas l'existence réelle du groupe). D'où la qualification
-  automatique par le code, indépendante de ce que l'admin tape.
+  la syntaxe, pas l'existence réelle du groupe). **Mise à jour** : depuis
+  que `use_fully_qualified_names` est forcé à `False` par défaut (voir
+  section suivante), c'est en fait l'inverse qui est vrai désormais - le
+  nom COURT est la forme qui résout réellement (`getent group g_linux`
+  fonctionne, pas `g_linux@domaine`) - le code a été adapté en
+  conséquence. Ce piège reste néanmoins réel et à surveiller si
+  `use_fully_qualified_names` redevient un jour configurable.
 
 Les deux sont **best-effort**, comme la jonction elle-même : un échec
 n'interrompt pas l'installation, juste un avertissement dans le log de
 session Calamares (voir ci-dessus).
+
+## Écran noir après connexion AD réussie (use_fully_qualified_names)
+
+Saga de débogage complète, en conditions réelles, après avoir corrigé le
+hostname (section précédente) : la jonction AD réussissait enfin sous le
+bon nom, mais **toute connexion via un compte AD provoquait un écran
+noir** juste après une authentification pourtant réussie (confirmé dans
+les logs : `pam_sss(sddm:auth): authentication success`).
+
+Chaîne de cause à effet, reconstituée pas à pas :
+1. `journalctl -u sddm` montrait `pam_systemd(sddm:session): Failed to
+   get user record: Aucun processus ayant ce numéro`, puis
+   `~/.local/share/sddm/wayland-session.log` révélait le vrai crash :
+   `Could not create wayland socket`, `kwin_wayland_wrapper` tué par
+   SIGABRT (confirmé via `systemd-coredump` dans le journal).
+2. Lecture du code source de `pam_systemd` (`src/login/pam_systemd.c`,
+   dépôt amont) : quand `userdb_by_name()` échoue, la fonction retourne
+   immédiatement `PAM_USER_UNKNOWN` **sans jamais créer
+   `/run/user/<uid>`** - le fait que la ligne soit préfixée `-` dans
+   `system-login` (échec non bloquant pour la pile PAM globale)
+   n'empêche donc pas ce dégât collatéral : Wayland n'a alors nulle part
+   où créer son socket.
+3. `SYSTEMD_LOG_LEVEL=debug userdbctl user <compte>@<domaine>` a
+   pointé la cause exacte : `io.systemd.UserDatabase.ConflictingRecordFound`.
+   Le multiplexeur `userdb` de systemd compare, **casse comprise**, le
+   nom saisi au login avec le nom canonique retourné par NSS/sssd, et
+   refuse l'enregistrement au moindre écart - `MTF0001@montferrini.local`
+   (tel que saisi) ne correspondait pas exactement à
+   `mtf0001@MONTFERRINI.LOCAL` (tel que `getent passwd` le retournait
+   réellement). `userdbctl user mtf0001@MONTFERRINI.LOCAL` (casse exacte)
+   fonctionnait parfaitement - confirmant le diagnostic - et la connexion
+   SDDM avec cette casse précise aboutissait enfin à un vrai bureau
+   Plasma.
+4. `case_sensitive = False` seul (réglage `sssd.conf` recommandé pour
+   AD) n'a **pas** résolu le problème - la vérification stricte de casse
+   vient de `systemd` lui-même, pas de `sssd`.
+5. Le vrai fix : `use_fully_qualified_names = False`. Avec un seul nom
+   court possible (`mtf0001`) plutôt que plusieurs formes coexistantes
+   (courte/qualifiée, casses variables), l'ambiguïté qui causait le
+   `ConflictingRecordFound` disparaît. Confirmé fonctionnel de bout en
+   bout avec juste `mtf0001` (en respectant sa casse canonique - AD
+   normalise en général en minuscules).
+6. **Piège d'application** : un premier essai avec `sed .../a` pour
+   insérer `use_fully_qualified_names = False` juste après l'en-tête de
+   section a semblé ne rien changer - en fait, la ligne d'origine
+   (`= True`, générée par `realm join`) restait plus loin dans le
+   fichier, et une clé ini dupliquée garde sa **dernière** occurrence.
+   D'où la réécriture complète de la section dans `adjoinjob` (retire
+   TOUTE occurrence existante des deux clés avant de réinjecter la
+   sienne une seule fois) plutôt qu'un simple ajout en tête.
+
+`adjoinjob` applique donc systématiquement, après une jonction réussie :
+`use_fully_qualified_names = False` et `case_sensitive = False` dans la
+section `[domain/<REALM>]` de `/etc/sssd/sssd.conf`. Une limitation
+assumée : dans un environnement à plusieurs domaines/forêts en
+confiance, l'absence de qualification par domaine redevient ambiguë -
+pas notre scénario cible ici (une seule jonction par machine).
+
+**Piège annexe utile pendant ce débogage** : le journal systemd est
+**volatile (RAM uniquement)** par défaut sur Arch - un plantage
+nécessitant un redémarrage forcé perd tous les logs du démarrage
+incriminé. Voir `etc/systemd/journald.conf.d/persistent-storage.conf`
+(`Storage=persistent`), ajouté suite à exactement ce problème rencontré
+pendant cette investigation.
 
 ## Piège annexe - horloge VMware vs chronyd (fait planter sssd)
 
