@@ -269,7 +269,7 @@ incriminé. Voir `etc/systemd/journald.conf.d/persistent-storage.conf`
 (`Storage=persistent`), ajouté suite à exactement ce problème rencontré
 pendant cette investigation.
 
-## Piège annexe - horloge VMware vs chronyd (fait planter sssd)
+## Piège annexe - horloges concurrentes vs chronyd (fait planter sssd)
 
 Confirmé en conditions réelles sur une VM VMware : la jonction AD réussit
 et `id <user>@domaine` fonctionne, mais **toute connexion échoue** (SDDM,
@@ -288,6 +288,27 @@ lorsque le processus survit. Fix : `airootfs/etc/vmware-tools/tools.conf`
 désactive la synchro VMware (`[timesync] disable = TRUE`) - sans effet si
 la machine ne tourne pas sous VMware, `chronyd` reste la seule source de
 vérité pour l'heure sur toute installation Compass Arch.
+
+**Deuxième source du même problème, trouvée après coup** : sur une
+nouvelle installation (VMware Tools bien désactivé, confirmé), le même
+symptôme exact est réapparu - `chronyd` signalait à nouveau "System clock
+interference detected", et `sssd_be` replantait en boucle
+(`journalctl -u sssd` : "Child [...] was terminated by own WATCHDOG"
+toutes les ~30s). Cette fois la cause était **`systemd-timesyncd`**,
+activé par défaut sur Arch (`systemctl status systemd-timesyncd` →
+`active (running)`, synchronisant sur le même pool NTP que `chronyd` en
+parallèle) - un service qu'on n'avait jusque-là jamais pensé à désactiver
+explicitement puisqu'aucune install précédente ne l'avait révélé aussi
+clairement. Fix : `services-systemd.conf` masque désormais
+`systemd-timesyncd.service` (`mask`, pas seulement `disable`, pour
+empêcher aussi un démarrage déclenché indirectement par une dépendance
+d'un autre service). Leçon retenue : **toute source de synchronisation
+d'horloge concurrente à `chronyd`** (VMware Tools, `systemd-timesyncd`,
+et potentiellement d'autres selon la plateforme - `ntpd`, `openntpd`...)
+est susceptible de provoquer exactement cette même classe de panne ; si
+ce symptôme réapparaît une troisième fois sur une plateforme différente,
+chercher un mécanisme de synchro horloge concurrent avant toute autre
+piste.
 
 ## NSS / PAM (statique, hors du module)
 
