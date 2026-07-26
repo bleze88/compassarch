@@ -16,3 +16,17 @@
 set -euo pipefail
 
 rm -f /etc/sddm.conf.d/20-liveuser-autologin.conf
+
+# Icône/entrée de menu "Installer Compass Arch" (Calamares) : n'a de sens
+# que sur le live - Calamares dépend de choses propres à l'environnement
+# live (unpackfs, /run/archiso/bootmnt...) et ne peut de toute façon pas
+# fonctionner correctement lancé depuis le système déjà installé. Sans
+# ça, unpackfs copie l'icône telle quelle sur la cible : présente sur le
+# bureau du compte qui vient d'être créé (déjà copié depuis
+# /etc/skel/Desktop à ce stade, "users" ayant tourné avant ce script -
+# voir settings.conf) et resservie à chaque nouveau compte (y compris un
+# futur compte AD via pam_mkhomedir) tant que le modèle /etc/skel n'est
+# pas nettoyé aussi.
+rm -f /usr/share/applications/install-distro.desktop
+rm -f /etc/skel/Desktop/install-distro.desktop
+rm -f /home/*/Desktop/install-distro.desktop

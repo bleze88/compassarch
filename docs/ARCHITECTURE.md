@@ -238,7 +238,15 @@ Fix (deux mécanismes complémentaires, tous deux après `users` et avant
    aussi bien en live qu'installé) précisément pour pouvoir être ciblé et
    supprimé sans toucher au reste - `removeuser` ne connaît que le compte
    Unix, pas la config SDDM, donc il faut ce second mécanisme même si le
-   compte `liveuser` disparaît.
+   compte `liveuser` disparaît. Ce même script supprime aussi l'icône
+   "Installer Compass Arch" (`install-distro.desktop`) - présente sur le
+   bureau du live pour lancer Calamares, mais sans utilité (et ne
+   fonctionnant de toute façon pas correctement) une fois le système
+   installé. Trois copies à retirer : `/usr/share/applications/` (entrée
+   de menu), `/etc/skel/Desktop/` (modèle - sinon tout futur compte, y
+   compris un compte AD créé via `pam_mkhomedir`, la récupère aussi), et
+   `/home/*/Desktop/` (déjà copiée dans le compte que `users` vient de
+   créer, puisque ce module tourne avant ce script dans la séquence).
 
 Le splash GRUB (`GRUB_BACKGROUND`, image dans `airootfs/boot/grub/splash.png`)
 et `GRUB_CMDLINE_LINUX_DEFAULT="... splash"` (pour activer Plymouth), eux,
