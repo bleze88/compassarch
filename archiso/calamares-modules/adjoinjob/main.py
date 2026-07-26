@@ -19,6 +19,8 @@ si ces champs ont été renseignés dans la page - vides par défaut, aucun
 changement de comportement si non utilisés.
 """
 
+import socket
+
 import libcalamares
 
 
@@ -54,10 +56,38 @@ def run():
         )
         return None
 
-    # Pas de hostnamectl ici : le hostname est déjà positionné par le module
-    # Calamares "users" avant que ce job ne s'exécute, et hostnamectl échoue
-    # de toute façon dans ce chroot (voir note --install= ci-dessous - même
-    # cause : pas de D-Bus système/systemd PID 1 disponible).
+    # Positionne le hostname NOYAU (pas juste /etc/hostname de la cible,
+    # déjà écrit par le module Calamares "users") avant realm join.
+    #
+    # Piège vécu en conditions réelles : sans ça, la machine rejoint bien
+    # l'AD mais sous le nom "archiso" (hostname du live) au lieu du nom
+    # voulu - `realm join`/`adcli` déterminent le nom de l'ordinateur AD via
+    # gethostname(), pas en lisant le fichier /etc/hostname de la cible.
+    # Un `chroot()` simple (ce que fait target_env_call) ne crée PAS de
+    # namespace UTS séparé, donc le hostname noyau reste celui du système
+    # live tant qu'on ne le change pas explicitement - d'où ce nom "archiso"
+    # incohérent avec le nom final "compass" une fois démarré. Cette
+    # incohérence casse ensuite l'authentification Kerberos après
+    # installation (SPN enregistrés sous "ARCHISO$" dans l'AD, keytab local
+    # généré pour ce même nom, alors que la machine s'appelle "compass" une
+    # fois redémarrée) - confirmé par un échec de connexion AD systématique
+    # après un premier essai avec ce bug.
+    #
+    # socket.sethostname() plutôt que hostnamectl (échoue ici, D-Bus
+    # indisponible - voir note --install= plus bas) ou la commande
+    # `hostname` (fournie par le paquet inetutils, pas dans packages.x86_64) :
+    # cet appel Python tourne directement sur le système live (ce process
+    # n'est PAS chrooté, contrairement aux commandes lancées via
+    # target_env_call), et comme chroot() ne sépare pas le namespace UTS,
+    # changer le hostname ici affecte bien le même noyau que celui vu par
+    # `realm join` ensuite (chrooté ou non).
+    try:
+        socket.sethostname(computer_name)
+    except OSError as exc:
+        libcalamares.utils.warning(
+            "adjoinjob: impossible de positionner le hostname noyau à '{}' ({}) - "
+            "la jonction AD risque d'utiliser le nom du live à la place.".format(computer_name, exc)
+        )
 
     # /etc/resolv.conf du système cible est un symlink vers
     # /run/systemd/resolve/stub-resolv.conf (voir airootfs/etc/resolv.conf) -

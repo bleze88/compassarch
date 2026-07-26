@@ -57,18 +57,40 @@ Deux modules Calamares custom, dans `archiso/calamares-modules/` :
   `services-systemd` (sssd/chronyd déjà activés sur la cible) et **avant**
   `bootloader`.
 - Lit `GlobalStorage["adjoin"]`. Si `enabled` est faux, ne fait rien.
-- Sinon, dans le chroot cible (`libcalamares.utils.target_env_call`) :
-  1. Écrit un `/etc/resolv.conf` fonctionnel dans la cible (voir piège
-     DNS ci-dessous)
-  2. `chronyd -q` (synchro horloge ponctuelle - Kerberos est sensible au
+- Sinon :
+  1. `socket.sethostname(computerName)` **depuis ce process Python
+     lui-même** (pas via `target_env_call`) - voir piège hostname
+     ci-dessous, critique pour que la jonction enregistre le bon nom dans
+     l'AD.
+  2. Dans le chroot cible (`libcalamares.utils.target_env_call`) : écrit un
+     `/etc/resolv.conf` fonctionnel dans la cible (voir piège DNS
+     ci-dessous)
+  3. `chronyd -q` (synchro horloge ponctuelle - Kerberos est sensible au
      décalage d'horloge)
-  3. `realm join --install=/ --user <adminUser> [--computer-ou <ou>] <domain>`,
+  4. `realm join --install=/ --user <adminUser> [--computer-ou <ou>] <domain>`,
      avec le mot de passe transmis **par stdin** (jamais en argument de
      commande visible dans `/proc`, jamais écrit sur disque)
-  4. `systemctl enable sssd.service`
-  (Pas de `hostnamectl set-hostname` : le hostname est déjà positionné par
-  le module Calamares `users` avant que ce job ne s'exécute, et
-  `hostnamectl` échouerait de toute façon ici - voir piège ci-dessous.)
+  5. `systemctl enable sssd.service`
+
+  **Piège critique - le hostname envoyé à l'AD n'est pas celui de
+  `/etc/hostname` de la cible** : `realm join`/`adcli` déterminent le nom
+  de l'ordinateur à enregistrer dans l'AD via `gethostname()` (l'appel
+  système, hostname du **noyau**), pas en lisant `/etc/hostname` de la
+  cible (que le module Calamares `users` écrit bien, mais ça ne suffit
+  pas). Comme `target_env_call` fait un simple `chroot()` - qui n'isole
+  **pas** le namespace UTS - le hostname noyau reste celui du système live
+  ("archiso") tant qu'on ne le change pas explicitement. Confirmé en
+  conditions réelles : la machine rejoignait bien l'AD, mais sous le nom
+  "archiso" au lieu du nom voulu, et l'authentification échouait
+  systématiquement après le premier démarrage (SPN Kerberos/keytab générés
+  pour "ARCHISO$", incohérents avec le hostname réel "compass" une fois
+  installé). Fix : `socket.sethostname()` appelé directement depuis ce
+  process Python (qui tourne sur le live, pas chrooté) plutôt que
+  `hostnamectl` (échoue, D-Bus indisponible - même cause que pour `realm
+  join` ci-dessous) ou la commande `hostname` (paquet `inetutils`, pas
+  dans `packages.x86_64`) - `chroot()` ne créant pas de namespace UTS
+  séparé, cet appel affecte le même noyau que celui vu ensuite par `realm
+  join`, chrooté ou non.
 
   **Piège critique - DNS ne fonctionne pas dans le chroot** :
   `airootfs/etc/resolv.conf` est un symlink vers
